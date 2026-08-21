@@ -1,5 +1,7 @@
 import { Service } from '../../services/Service';
+import { Config } from '../../Config';
 import { ControlCenter } from './ControlCenter';
+import { StatsStore } from './StatsStore';
 import { Device } from '../Device';
 import { TypedEmitter } from '../../../common/TypedEmitter';
 import { DeviceState } from '../../../common/DeviceState';
@@ -36,20 +38,24 @@ const SAMPLE_COMMAND =
     'done';
 
 const SAMPLE_TIMEOUT_MS = 8000;
+// a device file is compacted once it holds this many more lines than the retention window
+const COMPACT_AFTER_LINES = Math.ceil((STATS_RETENTION_MS / STATS_SAMPLE_INTERVAL_MS) * 1.5);
 const MIN_VALID_CELSIUS = -30;
 const MAX_VALID_CELSIUS = 150;
 
 /**
  * Samples battery level and temperature sensors of every connected Android device
- * on a fixed interval and keeps a bounded in-memory history per device, so a client
- * opening the stats view later still gets the past hours, not just what happens
- * while the tab is open.
+ * on a fixed interval and keeps a bounded history per device, so a client opening
+ * the stats view later still gets the past hours, not just what happens while the
+ * tab is open. The history lives in memory and, when `statsDataDir` is configured,
+ * is mirrored to disk (see StatsStore) so it survives restarts.
  */
 export class StatsCollector extends TypedEmitter<StatsCollectorEvents> implements Service {
     public static readonly TAG = 'StatsCollector';
     private static instance?: StatsCollector;
 
     private timer?: Timeout;
+    private store?: StatsStore;
     private readonly history: Map<string, StatsSample[]> = new Map();
     private readonly inFlight: Set<string> = new Set();
     private readonly failing: Set<string> = new Set();
@@ -76,6 +82,19 @@ export class StatsCollector extends TypedEmitter<StatsCollectorEvents> implement
     public async start(): Promise<void> {
         if (this.timer) {
             return;
+        }
+        const dir = Config.getInstance().statsDataDir;
+        if (dir) {
+            this.store = new StatsStore(dir, STATS_RETENTION_MS, COMPACT_AFTER_LINES);
+            const loaded = this.store.load();
+            let count = 0;
+            loaded.forEach((samples, udid) => {
+                this.history.set(udid, samples);
+                count += samples.length;
+            });
+            console.log(`[${StatsCollector.TAG}] History in "${dir}": ${count} samples for ${loaded.size} device(s)`);
+        } else {
+            console.log(`[${StatsCollector.TAG}] statsDataDir is empty: history is kept in memory only`);
         }
         this.timer = setInterval(this.tick, STATS_SAMPLE_INTERVAL_MS);
         this.tick();
@@ -151,6 +170,10 @@ export class StatsCollector extends TypedEmitter<StatsCollectorEvents> implement
         }
         if (expired) {
             list.splice(0, expired);
+        }
+        if (this.store) {
+            const retained = list;
+            this.store.append(udid, sample, () => retained);
         }
         this.emit('sample', { udid, sample });
     }

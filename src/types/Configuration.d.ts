@@ -45,4 +45,9 @@ export interface Configuration {
     runGoogTracker?: boolean;
     announceGoogTracker?: boolean;
     remoteHostList?: HostsItem[];
+    // Directory where the device stats history (see README, "Device stats") is
+    // persisted as one JSON-lines file per device, so it survives restarts.
+    // Relative paths resolve against the working directory. Default: "data/stats".
+    // An empty string keeps the history in memory only.
+    statsDataDir?: string;
 }

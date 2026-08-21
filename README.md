@@ -110,7 +110,7 @@ Control your device from `adb shell` in your browser.
 
 #### Device stats
 * Battery level and battery, CPU, GPU, skin and modem temperatures, sampled every
-10 seconds for every connected device and kept for 24 hours in the server's memory
+10 seconds for every connected device and kept for 24 hours
 * Live charts with selectable time range, hover readout and a table view
 
 ### iOS

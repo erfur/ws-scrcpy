@@ -5,3 +5,7 @@ runApplTracker: false
 server:
   - secure: false
     port: 8000
+
+# where the device stats history is persisted (one JSON-lines file per device);
+# /app/data is a named volume in docker-compose.yml
+statsDataDir: /app/data/stats

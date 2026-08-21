@@ -6,6 +6,7 @@ import { EnvName } from './EnvName';
 import YAML from 'yaml';
 
 const DEFAULT_PORT = 8000;
+const DEFAULT_STATS_DATA_DIR = 'data/stats';
 
 const YAML_RE = /^.+\.(yaml|yml)$/i;
 const JSON_RE = /^.+\.(json|js)$/i;
@@ -39,6 +40,7 @@ export class Config {
             announceApplTracker,
             server,
             remoteHostList: [],
+            statsDataDir: DEFAULT_STATS_DATA_DIR,
         };
         const merged = Object.assign({}, defaultConfig, userConfig);
         merged.server = merged.server.map((item) => this.parseServerItem(item));
@@ -152,5 +154,14 @@ export class Config {
 
     public get servers(): ServerItem[] {
         return this.fullConfig.server;
+    }
+
+    // Absolute path of the stats history directory, or '' when persistence is disabled
+    public get statsDataDir(): string {
+        const dir = this.fullConfig.statsDataDir;
+        if (typeof dir !== 'string' || !dir.trim()) {
+            return '';
+        }
+        return path.resolve(process.cwd(), dir.trim());
     }
 }

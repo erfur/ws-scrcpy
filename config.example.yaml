@@ -6,6 +6,11 @@ runGoogTracker: false
 ## track iOS devices (default: true, if was INCLUDE_APPL enabled in build config)
 runApplTracker: false;
 
+# Device stats history (see README, "Device stats") is persisted as one JSON-lines
+# file per device in this directory, so it survives restarts. Relative paths resolve
+# against the working directory. Default: data/stats. Empty string: memory only.
+statsDataDir: data/stats
+
 # HTTP[s] servers configuration
 server:
   - secure: false

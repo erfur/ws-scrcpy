@@ -12,6 +12,8 @@ services:
       - ./config.yaml:/app/config.yaml:ro
       # keep the adb keypair so devices stay authorized across restarts
       - adb-keys:/root/.android
+      # device stats history (statsDataDir in config.yaml) survives restarts
+      - stats-data:/app/data
       # USB-attached devices. Harmless if you only use wireless adb.
       - /dev/bus/usb:/dev/bus/usb
     device_cgroup_rules:
@@ -24,6 +26,7 @@ services:
 
 volumes:
   adb-keys:
+  stats-data:
 
 networks:
   pangolin:
