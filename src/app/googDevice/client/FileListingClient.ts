@@ -21,6 +21,7 @@ const parentDirLinkBox = 'parentDirLinkBox';
 const rootDirLinkBox = 'rootDirLinkBox';
 const tempDirLinkBox = 'tempDirLinkBox';
 const storageDirLinkBox = 'storageDirLinkBox';
+const pushFilesBox = 'pushFilesBox';
 
 const rootPath = '/';
 const tempPath = '/data/local/tmp';
@@ -88,6 +89,7 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
     private readonly wrapperId: string;
     private readonly filePushHandler?: FilePushHandler;
     private readonly parent: HTMLElement;
+    private readonly fileInput: HTMLInputElement;
     private enterCount = 0;
     private entries: Entry[] = [];
     private path: string;
@@ -108,6 +110,7 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
         this.name = `${TAG} [${this.serial}]`;
         this.tableBodyId = `${Util.escapeUdid(this.serial)}_list`;
         this.wrapperId = `wrapper_${this.tableBodyId}`;
+        const fileInputId = `push_${this.tableBodyId}_input`;
         const fragment = html`<div id="${this.wrapperId}" class="listing">
             <h1 id="header">Contents ${this.path}</h1>
             <div id="${parentDirLinkBox}" class="quick-link-box">
@@ -122,6 +125,12 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
             <div id="${tempDirLinkBox}" class="quick-link-box">
                 <a class="icon dir" href="#!" ${FileListingClient.PROPERTY_NAME}="${tempPath}/"> [temp] </a>
             </div>
+            <div id="${pushFilesBox}" class="quick-link-box push-files-box">
+                <button type="button" class="push-files-button" title="Upload files to the current directory">
+                    [push files]
+                </button>
+                <input id="${fileInputId}" type="file" multiple />
+            </div>
             <table>
                 <thead>
                     <tr>
@@ -134,6 +143,17 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
             </table>
         </div>`.content;
         this.tableBody = fragment.getElementById(this.tableBodyId) as HTMLElement;
+        this.fileInput = fragment.getElementById(fileInputId) as HTMLInputElement;
+        const pushButton = fragment.querySelector('.push-files-button') as HTMLButtonElement;
+        pushButton.addEventListener('click', () => {
+            this.fileInput.click();
+        });
+        this.fileInput.addEventListener('change', () => {
+            const files = this.fileInput.files ? Array.from(this.fileInput.files) : [];
+            // reset so the same file can be picked again later
+            this.fileInput.value = '';
+            this.pushFiles(files);
+        });
         const wrapper = fragment.getElementById(this.wrapperId);
         if (wrapper) {
             wrapper.addEventListener('click', (e) => {
@@ -193,6 +213,30 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
         this.enterCount = 0;
         this.removeForeground(Foreground.Drop);
         return true;
+    }
+
+    /**
+     * Upload files to the directory currently shown. Same flow as drag & drop: the
+     * FilePushHandler streams each file and reports progress via `onFilePushUpdate`.
+     */
+    public pushFiles(files: File[]): void {
+        if (!files.length) {
+            return;
+        }
+        if (!this.filePushHandler || !this.hasConnection()) {
+            files.forEach(({ name: fileName }) => {
+                this.onFilePushUpdate({
+                    pushId: FilePushHandler.REQUEST_NEW_PUSH_ID,
+                    fileName,
+                    message: 'no connection to the server',
+                    progress: -1,
+                    error: true,
+                    finished: true,
+                });
+            });
+            return;
+        }
+        this.filePushHandler.onFilesDrop(files);
     }
 
     private findOrCreateEntryRow(fileName: string): HTMLElement {

@@ -170,9 +170,10 @@ export class FilePushReader {
                 }
                 this.state = State.FINISH;
                 if (this.readStream) {
+                    // Only signal EOF here. adbkit sends the sync `DONE` command on the stream's
+                    // `end` event and a destroyed stream never emits it, so the push would hang
+                    // without a reply. `onPushEnd` -> `release()` closes the stream afterwards.
                     this.readStream.push(null);
-                    this.readStream.close();
-                    this.readStream = undefined;
                 }
                 break;
             case FilePushState.CANCEL:

@@ -100,7 +100,7 @@ Control your device from `adb shell` in your browser.
 
 #### File listing
 * List files
-* Upload files by drag & drop
+* Upload files by drag & drop or with the `[push files]` button (file picker)
 * Download files
 
 #### APK install

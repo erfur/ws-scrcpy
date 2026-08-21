@@ -27,6 +27,28 @@
     display: none;
 }
 
+.file-listing .push-files-box {
+    margin-left: 1em;
+}
+
+.file-listing .push-files-button {
+    padding: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: var(--link-color);
+    cursor: pointer;
+}
+
+.file-listing .push-files-button:hover,
+.file-listing .push-files-button:focus-visible {
+    text-decoration: underline;
+}
+
+.file-listing .push-files-box input[type='file'] {
+    display: none;
+}
+
 .file-listing a.icon {
     -webkit-padding-start: 1.5em;
     -moz-padding-start: 1.5em;
