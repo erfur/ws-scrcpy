@@ -1,0 +1,236 @@
+/* stream view: top bar content, stage and control rail (minimal light UI) */
+
+.stream-body {
+    display: flex;
+    flex-direction: row;
+    /* override .device-view's align-items so the rail spans the full height */
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
+}
+
+/* top bar content (rendered into the app shell top bar slots) */
+
+.stream-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-dot);
+    flex: none;
+    margin-left: 6px;
+}
+
+.stream-device-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-primary);
+    margin-left: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stream-device-serial {
+    font-size: 10.5px;
+    color: var(--ink-faintest);
+    margin-left: 10px;
+    white-space: nowrap;
+}
+
+.stream-stats {
+    font-size: 10.5px;
+    color: var(--ink-faintest);
+    white-space: nowrap;
+}
+
+.stream-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-control);
+    border-radius: 4px;
+    color: var(--ink-secondary);
+    font-size: 10.5px;
+    margin-left: 10px;
+    white-space: nowrap;
+}
+
+.stream-pill select {
+    border: none;
+    background: none;
+    color: var(--accent-hover);
+    font-family: var(--ui-font);
+    font-size: 10.5px;
+    outline: none;
+    cursor: pointer;
+}
+
+/* stage */
+
+.stream-stage {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    background: var(--stage-bg);
+    position: relative;
+    overflow: hidden;
+}
+
+.stream-frame {
+    border-radius: 14px;
+    border: 1px solid var(--border-dashed);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    background: #000;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.stream-frame .video {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+    background-color: #000;
+}
+
+.stream-flash {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 7px 14px;
+    background: var(--flash-bg);
+    color: #fff;
+    border-radius: 5px;
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.stream-flash.hidden {
+    display: none;
+}
+
+/* control rail */
+
+.stream-rail {
+    flex: 0 0 auto;
+    width: 224px;
+    box-sizing: border-box;
+    border-left: 1px solid var(--border-divider);
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: var(--page-bg);
+    overflow-y: auto;
+}
+
+.rail-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rail-section-label {
+    font-size: 10px;
+    color: var(--ink-faintest);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rail-row {
+    display: flex;
+    gap: 6px;
+}
+
+.rail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.rail-button {
+    flex: 1;
+    padding: 8px 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border-control);
+    border-radius: 5px;
+    color: var(--ink-secondary);
+    font-family: var(--ui-font);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.rail-button:hover {
+    border-color: var(--border-hover);
+}
+
+.rail-button:active {
+    background: var(--accent-tint-bg);
+}
+
+.rail-button.nav {
+    padding: 9px 0;
+    font-size: 13px;
+}
+
+.rail-button.nav:hover {
+    color: var(--accent-hover);
+    border-color: var(--accent-tint-border);
+}
+
+.rail-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-control);
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+}
+
+.rail-toggle-label {
+    font-size: 11px;
+    color: var(--ink-secondary);
+    font-family: var(--ui-font);
+}
+
+.rail-toggle-track {
+    width: 28px;
+    height: 15px;
+    border-radius: 8px;
+    background: var(--toggle-off-track);
+    position: relative;
+    display: inline-block;
+    transition: background 0.15s;
+    flex: none;
+}
+
+.rail-toggle-track.on {
+    background: var(--accent);
+}
+
+.rail-toggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #fff;
+    transition: left 0.15s;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.rail-toggle-track.on .rail-toggle-knob {
+    left: 15px;
+}

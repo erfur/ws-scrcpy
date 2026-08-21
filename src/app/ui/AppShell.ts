@@ -19,9 +19,10 @@ export interface TabHandle {
 
 type TabRecord = {
     id: string;
-    tabEl: HTMLElement;
     titleEl: HTMLElement;
     panel: HTMLElement;
+    topBarLeft: HTMLElement;
+    topBarRight: HTMLElement;
     onClose?: () => void;
 };
 
@@ -29,15 +30,20 @@ type ActionHandler = (params: URLSearchParams) => void;
 
 const TAG = '[AppShell]';
 
+// Two-level navigation matching the minimal UI design: a full-page device
+// list and a content view (stream/shell/devtools/...) with a top bar that
+// carries the "← devices" back button. Only one content panel is open at a
+// time; going back to the device list closes it.
 export class AppShell {
     private static active = false;
     private static tabs: Map<string, TabRecord> = new Map();
     private static actions: Map<string, ActionHandler> = new Map();
     private static mountTarget?: HTMLElement;
-    private static deviceListHolderEl?: HTMLElement;
-    private static tabBarEl?: HTMLElement;
+    private static listViewEl?: HTMLElement;
+    private static contentViewEl?: HTMLElement;
+    private static topBarLeftHolderEl?: HTMLElement;
+    private static topBarRightHolderEl?: HTMLElement;
     private static panelsEl?: HTMLElement;
-    private static placeholderEl?: HTMLElement;
     private static activeTabId?: string;
 
     public static init(): void {
@@ -50,42 +56,37 @@ export class AppShell {
         const app = document.createElement('div');
         app.id = 'app';
 
-        const sidebar = document.createElement('aside');
-        sidebar.id = 'app-sidebar';
-        const sidebarHeader = document.createElement('div');
-        sidebarHeader.className = 'sidebar-header';
-        const appTitle = document.createElement('span');
-        appTitle.className = 'app-title';
-        appTitle.innerText = 'ws scrcpy';
-        sidebarHeader.appendChild(appTitle);
-        sidebar.appendChild(sidebarHeader);
-        const deviceListHolder = (this.deviceListHolderEl = document.createElement('div'));
-        deviceListHolder.id = 'app-device-list';
-        sidebar.appendChild(deviceListHolder);
+        const listView = (this.listViewEl = document.createElement('div'));
+        listView.id = 'app-list-view';
 
-        const main = document.createElement('main');
-        main.id = 'app-main';
-        const tabBar = (this.tabBarEl = document.createElement('div'));
-        tabBar.id = 'app-tab-bar';
-        const sidebarToggle = document.createElement('button');
-        sidebarToggle.id = 'app-sidebar-toggle';
-        sidebarToggle.title = 'Toggle device list';
-        sidebarToggle.innerText = '☰';
-        sidebarToggle.onclick = () => {
-            sidebar.classList.toggle('collapsed');
+        const contentView = (this.contentViewEl = document.createElement('div'));
+        contentView.id = 'app-content-view';
+        contentView.classList.add('hidden');
+
+        const topBar = document.createElement('div');
+        topBar.id = 'app-top-bar';
+        const backButton = document.createElement('button');
+        backButton.id = 'app-back-button';
+        backButton.innerText = '← devices';
+        backButton.title = 'Back to the device list';
+        backButton.onclick = () => {
+            this.showList();
         };
-        tabBar.appendChild(sidebarToggle);
+        topBar.appendChild(backButton);
+        const topBarLeft = (this.topBarLeftHolderEl = document.createElement('div'));
+        topBarLeft.id = 'app-top-bar-left';
+        topBar.appendChild(topBarLeft);
+        const topBarRight = (this.topBarRightHolderEl = document.createElement('div'));
+        topBarRight.id = 'app-top-bar-right';
+        topBar.appendChild(topBarRight);
+        contentView.appendChild(topBar);
+
         const panels = (this.panelsEl = document.createElement('div'));
         panels.id = 'app-panels';
-        const placeholder = (this.placeholderEl = document.createElement('div'));
-        placeholder.id = 'app-placeholder';
-        placeholder.innerHTML = '<div class="placeholder-message">Select a device from the list to start</div>';
-        panels.appendChild(placeholder);
-        main.appendChild(tabBar);
-        main.appendChild(panels);
+        contentView.appendChild(panels);
 
-        app.appendChild(sidebar);
-        app.appendChild(main);
+        app.appendChild(listView);
+        app.appendChild(contentView);
         document.body.appendChild(app);
     }
 
@@ -94,7 +95,7 @@ export class AppShell {
     }
 
     public static getDeviceListHolder(): HTMLElement | undefined {
-        return this.deviceListHolderEl;
+        return this.listViewEl;
     }
 
     public static registerAction(action: string, handler: ActionHandler): void {
@@ -140,10 +141,15 @@ export class AppShell {
                 return this.createHandle(existing, false);
             }
         }
+        // a single content panel at a time: opening a new one closes the rest
+        for (const openId of Array.from(this.tabs.keys())) {
+            if (openId !== id) {
+                this.closeTab(openId);
+            }
+        }
         const record = this.createTab(id, title, className);
         this.tabs.set(id, record);
         this.focusTab(id);
-        this.updatePlaceholder();
         this.mountTarget = record.panel;
         return this.createHandle(record, true);
     }
@@ -159,10 +165,12 @@ export class AppShell {
         }
         this.tabs.forEach((item) => {
             const active = item.id === id;
-            item.tabEl.classList.toggle('active', active);
             item.panel.classList.toggle('hidden', !active);
+            item.topBarLeft.classList.toggle('hidden', !active);
+            item.topBarRight.classList.toggle('hidden', !active);
         });
         this.activeTabId = id;
+        this.showContent();
         return true;
     }
 
@@ -173,8 +181,9 @@ export class AppShell {
         }
         // remove the record first: `onClose` handlers may call back into `closeTab`
         this.tabs.delete(id);
-        record.tabEl.remove();
         record.panel.remove();
+        record.topBarLeft.remove();
+        record.topBarRight.remove();
         if (record.onClose) {
             try {
                 record.onClose();
@@ -184,12 +193,10 @@ export class AppShell {
         }
         if (this.activeTabId === id) {
             this.activeTabId = undefined;
-            const last = Array.from(this.tabs.keys()).pop();
-            if (last) {
-                this.focusTab(last);
-            }
         }
-        this.updatePlaceholder();
+        if (!this.tabs.size) {
+            this.showList();
+        }
     }
 
     // Close the tab whose panel contains the given element (used by clients that stop themselves)
@@ -203,36 +210,58 @@ export class AppShell {
     }
 
     public static setTabTitle(panelOrChild: HTMLElement, title: string): void {
-        for (const record of this.tabs.values()) {
-            if (record.panel === panelOrChild || record.panel.contains(panelOrChild)) {
-                record.titleEl.innerText = title;
-                record.titleEl.title = title;
-                return;
-            }
+        const record = this.findRecord(panelOrChild);
+        if (record) {
+            record.titleEl.innerText = title;
+            record.titleEl.title = title;
         }
     }
 
+    // Top bar area right after the back button; clients may fill it with custom content
+    public static getTopBarLeft(panelOrChild: HTMLElement): HTMLElement | undefined {
+        return this.findRecord(panelOrChild)?.topBarLeft;
+    }
+
+    // Right-aligned top bar area of the panel's view
+    public static getTopBarRight(panelOrChild: HTMLElement): HTMLElement | undefined {
+        return this.findRecord(panelOrChild)?.topBarRight;
+    }
+
+    private static findRecord(panelOrChild: HTMLElement): TabRecord | undefined {
+        for (const record of this.tabs.values()) {
+            if (record.panel === panelOrChild || record.panel.contains(panelOrChild)) {
+                return record;
+            }
+        }
+        return;
+    }
+
+    private static showList(): void {
+        for (const openId of Array.from(this.tabs.keys())) {
+            this.closeTab(openId);
+        }
+        this.listViewEl?.classList.remove('hidden');
+        this.contentViewEl?.classList.add('hidden');
+    }
+
+    private static showContent(): void {
+        this.listViewEl?.classList.add('hidden');
+        this.contentViewEl?.classList.remove('hidden');
+    }
+
     private static createTab(id: string, title: string, className?: string): TabRecord {
-        const tabEl = document.createElement('div');
-        tabEl.className = 'app-tab';
+        const topBarLeft = document.createElement('div');
+        topBarLeft.className = 'top-bar-slot top-bar-slot-left';
         const titleEl = document.createElement('span');
-        titleEl.className = 'app-tab-title';
+        titleEl.className = 'top-bar-title';
         titleEl.innerText = title;
         titleEl.title = title;
-        tabEl.appendChild(titleEl);
-        const closeEl = document.createElement('button');
-        closeEl.className = 'app-tab-close';
-        closeEl.title = 'Close';
-        closeEl.innerText = '×';
-        closeEl.onclick = (event) => {
-            event.stopPropagation();
-            this.closeTab(id);
-        };
-        tabEl.appendChild(closeEl);
-        tabEl.onclick = () => {
-            this.focusTab(id);
-        };
-        this.tabBarEl?.appendChild(tabEl);
+        topBarLeft.appendChild(titleEl);
+        this.topBarLeftHolderEl?.appendChild(topBarLeft);
+
+        const topBarRight = document.createElement('div');
+        topBarRight.className = 'top-bar-slot top-bar-slot-right';
+        this.topBarRightHolderEl?.appendChild(topBarRight);
 
         const panel = document.createElement('div');
         panel.className = 'app-panel';
@@ -240,7 +269,7 @@ export class AppShell {
             panel.classList.add(className);
         }
         this.panelsEl?.appendChild(panel);
-        return { id, tabEl, titleEl, panel };
+        return { id, titleEl, panel, topBarLeft, topBarRight };
     }
 
     private static createHandle(record: TabRecord, isNew: boolean): TabHandle {
@@ -259,11 +288,5 @@ export class AppShell {
                 AppShell.closeTab(record.id);
             },
         };
-    }
-
-    private static updatePlaceholder(): void {
-        if (this.placeholderEl) {
-            this.placeholderEl.classList.toggle('hidden', this.tabs.size > 0);
-        }
     }
 }

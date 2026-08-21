@@ -35,7 +35,7 @@ window.onload = async function (): Promise<void> {
         const params = StreamClientScrcpy.parseParameters(query);
         const tab = AppShell.openTab({
             id: `${StreamClientScrcpy.ACTION}:${params.udid}`,
-            title: `Stream ${params.udid}`,
+            title: `Stream ${params.deviceName || params.udid}`,
             className: 'stream',
         });
         if (!tab.isNew) {

@@ -5,38 +5,32 @@ import { ACTION } from '../../../common/Action';
 import GoogDeviceDescriptor from '../../../types/GoogDeviceDescriptor';
 import { ControlCenterCommand } from '../../../common/ControlCenterCommand';
 import { StreamClientScrcpy } from './StreamClientScrcpy';
-import SvgImage from '../../ui/SvgImage';
-import { html } from '../../ui/HtmlTag';
 import Util from '../../Util';
-import { Attribute } from '../../Attribute';
 import { DeviceState } from '../../../common/DeviceState';
 import { Message } from '../../../types/Message';
 import { ParamsDeviceTracker } from '../../../types/ParamsDeviceTracker';
 import { HostItem } from '../../../types/Configuration';
 import { ChannelCode } from '../../../common/ChannelCode';
 import { Tool } from '../../client/Tool';
+import { PlayerClass } from '../../player/BasePlayer';
+import { AppShell } from '../../ui/AppShell';
 
-type Field = keyof GoogDeviceDescriptor | ((descriptor: GoogDeviceDescriptor) => string);
-type DescriptionColumn = { title: string; field: Field };
-
-const DESC_COLUMNS: DescriptionColumn[] = [
-    {
-        title: 'Net Interface',
-        field: 'interfaces',
-    },
-    {
-        title: 'Server PID',
-        field: 'pid',
-    },
-];
+const ADDRESS_PATTERN = /^\d{1,3}(\.\d{1,3}){3}:\d{2,5}$/;
+const TOAST_TIMEOUT = 2500;
+// tools rendered inline in the card's main actions row, next to `stream`
+const INLINE_TOOLS = ['shell', 'devtools'];
 
 export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never> {
     public static readonly ACTION = ACTION.GOOG_DEVICE_LIST;
-    public static readonly CREATE_DIRECT_LINKS = true;
     private static instancesByUrl: Map<string, DeviceTracker> = new Map();
     protected static tools: Set<Tool> = new Set();
     protected tableId = 'goog_device_list';
-    private connectForm?: HTMLElement;
+    private connectForm?: HTMLFormElement;
+    private toastEl?: HTMLElement;
+    private toastTimer?: ReturnType<typeof setTimeout>;
+    private readonly reconnectingUdids: Set<string> = new Set();
+    private readonly pendingStreamUdids: Set<string> = new Set();
+    private readonly lastKnownStates: Map<string, string> = new Map();
 
     public static start(hostItem: HostItem): DeviceTracker {
         const url = this.buildUrlForTracker(hostItem).toString();
@@ -63,14 +57,65 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
     }
 
     protected buildDeviceTable(): void {
-        super.buildDeviceTable();
-        const block = document.getElementById(this.elementId);
-        if (block) {
-            block.appendChild(this.getOrCreateConnectForm());
-        }
+        const devices = this.getOrCreateTableHolder();
+        const tbody = this.getOrBuildTableBody(devices);
+        const block = this.getOrCreateTrackerBlock(tbody, this.trackerName);
+        block.classList.add('tracker-block');
+
+        this.handleDeviceStateTransitions();
+
+        block.appendChild(this.buildHeader());
+        block.appendChild(this.getOrCreateToast());
+
+        const grid = document.createElement('div');
+        grid.className = 'device-grid';
+        block.appendChild(grid);
+        this.descriptors.forEach((item) => {
+            this.buildDeviceRow(grid, item);
+        });
     }
 
-    private getOrCreateConnectForm(): HTMLElement {
+    // Detect `reconnect`/`stream` requests that were waiting for a state change
+    private handleDeviceStateTransitions(): void {
+        this.descriptors.forEach((device) => {
+            const { udid, state } = device;
+            const previous = this.lastKnownStates.get(udid);
+            if (state === DeviceState.DEVICE && previous !== DeviceState.DEVICE) {
+                if (this.reconnectingUdids.has(udid)) {
+                    this.reconnectingUdids.delete(udid);
+                    this.showToast(`${DeviceTracker.getDeviceName(device)} connected`);
+                }
+            }
+            if (state === DeviceState.DEVICE && device.pid !== -1 && this.pendingStreamUdids.has(udid)) {
+                this.pendingStreamUdids.delete(udid);
+                this.openStream(device);
+            }
+            this.lastKnownStates.set(udid, state);
+        });
+    }
+
+    private buildHeader(): HTMLElement {
+        const online = this.descriptors.filter((item) => item.state === DeviceState.DEVICE).length;
+        const offline = this.descriptors.length - online;
+        const header = document.createElement('div');
+        header.className = 'list-header';
+        const left = document.createElement('div');
+        left.className = 'list-header-left';
+        const title = document.createElement('span');
+        title.className = 'list-title';
+        title.innerText = 'devices';
+        title.title = this.trackerName;
+        left.appendChild(title);
+        const count = document.createElement('span');
+        count.className = 'list-count';
+        count.innerText = `${online} connected · ${offline} offline`;
+        left.appendChild(count);
+        header.appendChild(left);
+        header.appendChild(this.getOrCreateConnectForm());
+        return header;
+    }
+
+    private getOrCreateConnectForm(): HTMLFormElement {
         if (this.connectForm) {
             return this.connectForm;
         }
@@ -78,35 +123,64 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
         form.className = 'connect-to-address';
         const input = document.createElement('input');
         input.type = 'text';
-        input.placeholder = 'device address (ip:port)';
+        input.placeholder = 'ip:port';
         input.title = 'Connect to a network device, e.g. 192.168.0.42:5555';
         form.appendChild(input);
         const button = document.createElement('button');
         button.type = 'submit';
-        button.className = 'action-button active';
-        button.appendChild(SvgImage.create(SvgImage.Icon.REFRESH));
-        const span = document.createElement('span');
-        span.innerText = 'connect';
-        button.appendChild(span);
+        button.innerText = 'connect';
         form.appendChild(button);
         form.onsubmit = (event: Event): void => {
             event.preventDefault();
             const address = input.value.trim();
-            if (!address || !this.ws || this.ws.readyState !== this.ws.OPEN) {
+            if (!ADDRESS_PATTERN.test(address)) {
+                this.showToast('expected ip:port, e.g. 192.168.0.42:5555');
                 return;
             }
-            const data: Message = {
-                id: this.getNextId(),
-                type: ControlCenterCommand.CONNECT_DEVICE,
-                data: {
-                    udid: address,
-                },
-            };
-            this.ws.send(JSON.stringify(data));
+            if (!this.sendCommand(ControlCenterCommand.CONNECT_DEVICE, address)) {
+                return;
+            }
             input.value = '';
+            this.showToast(`connecting to ${address}…`);
         };
         this.connectForm = form;
         return form;
+    }
+
+    private getOrCreateToast(): HTMLElement {
+        if (!this.toastEl) {
+            this.toastEl = document.createElement('div');
+            this.toastEl.className = 'list-toast hidden';
+        }
+        return this.toastEl;
+    }
+
+    private showToast(text: string): void {
+        const toast = this.getOrCreateToast();
+        toast.innerText = text;
+        toast.classList.remove('hidden');
+        if (this.toastTimer) {
+            clearTimeout(this.toastTimer);
+        }
+        this.toastTimer = setTimeout(() => {
+            toast.classList.add('hidden');
+        }, TOAST_TIMEOUT);
+    }
+
+    private sendCommand(type: string, udid: string): boolean {
+        if (!this.ws || this.ws.readyState !== this.ws.OPEN) {
+            this.showToast('no connection to the tracker');
+            return false;
+        }
+        const data: Message = {
+            id: this.getNextId(),
+            type,
+            data: {
+                udid,
+            },
+        };
+        this.ws.send(JSON.stringify(data));
+        return true;
     }
 
     protected setIdAndHostName(id: string, hostName: string): void {
@@ -122,74 +196,35 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
         }
     }
 
-    onInterfaceSelected = (event: Event): void => {
-        const selectElement = event.currentTarget as HTMLSelectElement;
-        const option = selectElement.selectedOptions[0];
-        const url = decodeURI(option.getAttribute(Attribute.URL) || '');
-        const name = option.getAttribute(Attribute.NAME) || '';
-        const fullName = decodeURIComponent(selectElement.getAttribute(Attribute.FULL_NAME) || '');
-        const udid = selectElement.getAttribute(Attribute.UDID) || '';
-        this.updateLink({ url, name, fullName, udid, store: true });
-    };
-
-    private updateLink(params: { url: string; name: string; fullName: string; udid: string; store: boolean }): void {
-        const { url, name, fullName, udid, store } = params;
-        const playerTds = document.getElementsByName(
-            encodeURIComponent(`${DeviceTracker.AttributePrefixPlayerFor}${fullName}`),
-        );
-        if (typeof udid !== 'string') {
-            return;
-        }
-        if (store) {
-            const localStorageKey = DeviceTracker.getLocalStorageKey(fullName || '');
-            if (localStorage && name) {
-                localStorage.setItem(localStorageKey, name);
-            }
-        }
-        const action = ACTION.STREAM_SCRCPY;
-        playerTds.forEach((item) => {
-            item.innerHTML = '';
-            const playerFullName = item.getAttribute(DeviceTracker.AttributePlayerFullName);
-            const playerCodeName = item.getAttribute(DeviceTracker.AttributePlayerCodeName);
-            if (!playerFullName || !playerCodeName) {
-                return;
-            }
-            const link = DeviceTracker.buildLink(
-                {
-                    action,
-                    udid,
-                    player: decodeURIComponent(playerCodeName),
-                    ws: url,
-                },
-                decodeURIComponent(playerFullName),
-                this.params,
-            );
-            item.appendChild(link);
-        });
+    private static getDeviceName(device: GoogDeviceDescriptor): string {
+        const productName = `${device['ro.product.manufacturer']} ${device['ro.product.model']}`.trim();
+        return productName || device.udid;
     }
 
-    onActionButtonClick = (event: MouseEvent): void => {
-        const button = event.currentTarget as HTMLButtonElement;
-        const udid = button.getAttribute(Attribute.UDID);
-        const pidString = button.getAttribute(Attribute.PID) || '';
-        const command = button.getAttribute(Attribute.COMMAND) as string;
-        const pid = parseInt(pidString, 10);
-        const data: Message = {
-            id: this.getNextId(),
-            type: command,
-            data: {
-                udid: typeof udid === 'string' ? udid : undefined,
-                pid: isNaN(pid) ? undefined : pid,
-            },
-        };
-
-        if (this.ws && this.ws.readyState === this.ws.OPEN) {
-            this.ws.send(JSON.stringify(data));
+    private static formatLastSeen(timestamp: number): string {
+        if (!timestamp) {
+            return '—';
         }
-    };
+        const date = new Date(timestamp);
+        const now = new Date();
+        const pad = (value: number): string => value.toString().padStart(2, '0');
+        const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        if (date.getTime() >= startOfDay) {
+            return `today ${time}`;
+        }
+        if (date.getTime() >= startOfDay - 24 * 60 * 60 * 1000) {
+            return `yesterday ${time}`;
+        }
+        return `${date.toLocaleDateString()} ${time}`;
+    }
 
-    private static getLocalStorageKey(udid: string): string {
-        return `device_list::${udid}::interface`;
+    private static formatBattery(device: GoogDeviceDescriptor): string {
+        const level = device.batteryLevel;
+        if (typeof level !== 'number' || isNaN(level) || level < 0) {
+            return '—';
+        }
+        return `${level}%`;
     }
 
     protected static createUrl(params: ParamsDeviceTracker, udid = ''): URL {
@@ -206,216 +241,177 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
         return urlObject;
     }
 
-    protected static createInterfaceOption(name: string, url: string): HTMLOptionElement {
-        const optionElement = document.createElement('option');
-        optionElement.setAttribute(Attribute.URL, url);
-        optionElement.setAttribute(Attribute.NAME, name);
-        optionElement.innerText = `proxy over adb`;
-        return optionElement;
+    private getPreferredPlayer(udid: string): PlayerClass | undefined {
+        const players = StreamClientScrcpy.getPlayers();
+        if (!players.length) {
+            return;
+        }
+        const storageKey = `configure_stream::${Util.escapeUdid(udid)}::player`;
+        const storedName = window.localStorage ? window.localStorage.getItem(storageKey) : null;
+        const stored = players.find((player) => player.playerFullName === storedName);
+        if (stored) {
+            return stored;
+        }
+        const mse = players.find((player) => player.playerCodeName === 'mse');
+        return mse || players[0];
     }
 
-    private static titleToClassName(title: string): string {
-        return title.toLowerCase().replace(/\s/g, '_');
+    private openStream(device: GoogDeviceDescriptor): void {
+        const player = this.getPreferredPlayer(device.udid);
+        if (!player) {
+            this.showToast('no supported player available in this browser');
+            return;
+        }
+        const ws = DeviceTracker.createUrl(this.params, device.udid).toString();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const q: any = {
+            action: ACTION.STREAM_SCRCPY,
+            udid: device.udid,
+            player: player.playerCodeName,
+            ws,
+            captureKeyboard: true,
+            name: DeviceTracker.getDeviceName(device),
+        };
+        const query = DeviceTracker.buildQuery(q, this.params);
+        if (!AppShell.route(query)) {
+            this.showToast('failed to open the stream view');
+        }
+    }
+
+    private onStreamClick(device: GoogDeviceDescriptor): void {
+        if (device.pid !== -1) {
+            this.openStream(device);
+            return;
+        }
+        // no server on the device yet: start it and stream once it reports a pid
+        if (this.sendCommand(ControlCenterCommand.START_SERVER, device.udid)) {
+            this.pendingStreamUdids.add(device.udid);
+            this.showToast(`starting server on ${DeviceTracker.getDeviceName(device)}…`);
+        }
+    }
+
+    private onReconnectClick(device: GoogDeviceDescriptor): void {
+        if (this.sendCommand(ControlCenterCommand.CONNECT_DEVICE, device.udid)) {
+            this.reconnectingUdids.add(device.udid);
+            this.buildDeviceTable();
+        }
+    }
+
+    private buildCardRow(label: string, value: string, valueClass?: string): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'card-row';
+        const labelEl = document.createElement('span');
+        labelEl.className = 'card-row-label';
+        labelEl.innerText = label;
+        row.appendChild(labelEl);
+        const valueEl = document.createElement('span');
+        valueEl.className = 'card-row-value';
+        if (valueClass) {
+            valueEl.classList.add(valueClass);
+        }
+        valueEl.innerText = value;
+        row.appendChild(valueEl);
+        return row;
     }
 
     protected buildDeviceRow(tbody: Element, device: GoogDeviceDescriptor): void {
-        let selectedInterfaceUrl = '';
-        let selectedInterfaceName = '';
-        const blockClass = 'desc-block';
-        const fullName = `${this.id}_${Util.escapeUdid(device.udid)}`;
         const isActive = device.state === DeviceState.DEVICE;
-        let hasPid = false;
-        const servicesId = `device_services_${fullName}`;
-        const productName = `${device['ro.product.manufacturer']} ${device['ro.product.model']}`.trim();
-        const deviceName = productName || device.udid;
-        const row = html`<div class="device ${isActive ? 'active' : 'not-active'}">
-            <div class="device-header">
-                <div class="device-name">${deviceName}</div>
-                <div class="device-serial">${productName ? device.udid : ''}</div>
-                <div class="device-version">
-                    <div class="release-version">${device['ro.build.version.release']}</div>
-                    <div class="sdk-version">${device['ro.build.version.sdk']}</div>
-                </div>
-                <div class="device-state" title="State: ${device.state}"></div>
-                <div class="device-state-label">${isActive ? '' : device.state}</div>
-            </div>
-            <div id="${servicesId}" class="services"></div>
-        </div>`.content;
-        const stateEl = row.querySelector('.device-state');
-        stateEl?.setAttribute('data-state', device.state);
-        const services = row.getElementById(servicesId);
-        if (!services) {
-            return;
+        const isUnauthorized = device.state === DeviceState.UNAUTHORIZED;
+
+        const card = document.createElement('div');
+        card.className = `device-card ${isActive ? 'online' : 'offline'}`;
+        card.setAttribute('data-state', device.state);
+
+        const header = document.createElement('div');
+        header.className = 'card-header';
+        const name = document.createElement('span');
+        name.className = 'card-name';
+        name.innerText = DeviceTracker.getDeviceName(device);
+        name.title = device.udid;
+        header.appendChild(name);
+        const chip = document.createElement('span');
+        chip.className = 'card-chip';
+        const dot = document.createElement('span');
+        dot.className = 'card-chip-dot';
+        chip.appendChild(dot);
+        chip.appendChild(document.createTextNode(device.state));
+        header.appendChild(chip);
+        card.appendChild(header);
+
+        const rows = document.createElement('div');
+        rows.className = 'card-rows';
+        rows.appendChild(this.buildCardRow('serial', device.udid));
+        if (isActive) {
+            const release = device['ro.build.version.release'] || '—';
+            const sdk = device['ro.build.version.sdk'];
+            rows.appendChild(this.buildCardRow('android', sdk ? `${release} · API ${sdk}` : release));
+            rows.appendChild(this.buildCardRow('battery', DeviceTracker.formatBattery(device), 'strong'));
+        } else {
+            rows.appendChild(
+                this.buildCardRow('last seen', DeviceTracker.formatLastSeen(device['last.update.timestamp'])),
+            );
         }
+        card.appendChild(rows);
 
-        if (!isActive) {
-            const connectTd = document.createElement('div');
-            connectTd.classList.add('connect', blockClass);
-            const connectButton = document.createElement('button');
-            connectButton.className = 'action-button connect-button active';
-            connectButton.title =
-                device.state === DeviceState.UNAUTHORIZED
-                    ? 'Reconnect and request authorization on the device'
-                    : 'Try to connect to this device';
-            connectButton.setAttribute(Attribute.UDID, device.udid);
-            connectButton.setAttribute(Attribute.COMMAND, ControlCenterCommand.CONNECT_DEVICE);
-            connectButton.onclick = this.onActionButtonClick;
-            connectButton.appendChild(SvgImage.create(SvgImage.Icon.REFRESH));
-            const span = document.createElement('span');
-            span.innerText = 'connect';
-            connectButton.appendChild(span);
-            connectTd.appendChild(connectButton);
-            services.appendChild(connectTd);
-        }
+        if (isActive) {
+            const actions = document.createElement('div');
+            actions.className = 'card-actions';
+            const streamButton = document.createElement('button');
+            streamButton.className = 'card-button-primary';
+            streamButton.innerText = 'stream';
+            streamButton.title = `Stream ${DeviceTracker.getDeviceName(device)}`;
+            streamButton.onclick = () => {
+                this.onStreamClick(device);
+            };
+            actions.appendChild(streamButton);
 
-        DeviceTracker.tools.forEach((tool) => {
-            const entry = tool.createEntryForDeviceList(device, blockClass, this.params);
-            if (entry) {
-                if (Array.isArray(entry)) {
-                    entry.forEach((item) => {
-                        item && services.appendChild(item);
-                    });
-                } else {
-                    services.appendChild(entry);
+            const extraTools: HTMLElement[] = [];
+            DeviceTracker.tools.forEach((tool) => {
+                const entry = tool.createEntryForDeviceList(device, 'card-tool', this.params);
+                if (!entry) {
+                    return;
                 }
-            }
-        });
-
-        const streamEntry = StreamClientScrcpy.createEntryForDeviceList(device, blockClass, fullName, this.params);
-        streamEntry && services.appendChild(streamEntry);
-
-        DESC_COLUMNS.forEach((item) => {
-            const { title } = item;
-            const fieldName = item.field;
-            let value: string;
-            if (typeof item.field === 'string') {
-                value = '' + device[item.field];
-            } else {
-                value = item.field(device);
-            }
-            const td = document.createElement('div');
-            td.classList.add(DeviceTracker.titleToClassName(title), blockClass);
-            services.appendChild(td);
-            if (fieldName === 'pid') {
-                hasPid = value !== '-1';
-                const actionButton = document.createElement('button');
-                actionButton.className = 'action-button kill-server-button';
-                actionButton.setAttribute(Attribute.UDID, device.udid);
-                actionButton.setAttribute(Attribute.PID, value);
-                let command: string;
-                if (isActive) {
-                    actionButton.classList.add('active');
-                    actionButton.onclick = this.onActionButtonClick;
-                    if (hasPid) {
-                        command = ControlCenterCommand.KILL_SERVER;
-                        actionButton.title = 'Kill server';
-                        actionButton.appendChild(SvgImage.create(SvgImage.Icon.CANCEL));
-                    } else {
-                        command = ControlCenterCommand.START_SERVER;
-                        actionButton.title = 'Start server';
-                        actionButton.appendChild(SvgImage.create(SvgImage.Icon.REFRESH));
+                const entries = Array.isArray(entry) ? entry : [entry];
+                entries.forEach((item) => {
+                    if (!item) {
+                        return;
                     }
-                    actionButton.setAttribute(Attribute.COMMAND, command);
-                } else {
-                    const timestamp = device['last.update.timestamp'];
-                    if (timestamp) {
-                        const date = new Date(timestamp);
-                        actionButton.title = `Last update on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`;
+                    const inline = INLINE_TOOLS.some((toolClass) =>
+                        (item as HTMLElement).classList?.contains(toolClass),
+                    );
+                    if (inline) {
+                        actions.appendChild(item);
                     } else {
-                        actionButton.title = `Not active`;
-                    }
-                    actionButton.appendChild(SvgImage.create(SvgImage.Icon.OFFLINE));
-                }
-                const span = document.createElement('span');
-                span.innerText = value;
-                actionButton.appendChild(span);
-                td.appendChild(actionButton);
-            } else if (fieldName === 'interfaces') {
-                const proxyInterfaceUrl = DeviceTracker.createUrl(this.params, device.udid).toString();
-                const proxyInterfaceName = 'proxy';
-                const localStorageKey = DeviceTracker.getLocalStorageKey(fullName);
-                const lastSelected = localStorage && localStorage.getItem(localStorageKey);
-                const selectElement = document.createElement('select');
-                selectElement.setAttribute(Attribute.UDID, device.udid);
-                selectElement.setAttribute(Attribute.FULL_NAME, fullName);
-                selectElement.setAttribute(
-                    'name',
-                    encodeURIComponent(`${DeviceTracker.AttributePrefixInterfaceSelectFor}${fullName}`),
-                );
-                /// #if SCRCPY_LISTENS_ON_ALL_INTERFACES
-                device.interfaces.forEach((value) => {
-                    const params = {
-                        ...this.params,
-                        secure: false,
-                        hostname: value.ipv4,
-                        port: SERVER_PORT,
-                    };
-                    const url = DeviceTracker.createUrl(params).toString();
-                    const optionElement = DeviceTracker.createInterfaceOption(value.name, url);
-                    optionElement.innerText = `${value.name}: ${value.ipv4}`;
-                    selectElement.appendChild(optionElement);
-                    if (lastSelected) {
-                        if (lastSelected === value.name || !selectedInterfaceName) {
-                            optionElement.selected = true;
-                            selectedInterfaceUrl = url;
-                            selectedInterfaceName = value.name;
-                        }
-                    } else if (device['wifi.interface'] === value.name) {
-                        optionElement.selected = true;
+                        extraTools.push(item as HTMLElement);
                     }
                 });
-                /// #else
-                selectedInterfaceUrl = proxyInterfaceUrl;
-                selectedInterfaceName = proxyInterfaceName;
-                td.classList.add('hidden');
-                /// #endif
-                if (isActive) {
-                    const adbProxyOption = DeviceTracker.createInterfaceOption(proxyInterfaceName, proxyInterfaceUrl);
-                    if (lastSelected === proxyInterfaceName || !selectedInterfaceName) {
-                        adbProxyOption.selected = true;
-                        selectedInterfaceUrl = proxyInterfaceUrl;
-                        selectedInterfaceName = proxyInterfaceName;
-                    }
-                    selectElement.appendChild(adbProxyOption);
-                    const actionButton = document.createElement('button');
-                    actionButton.className = 'action-button update-interfaces-button active';
-                    actionButton.title = `Update information`;
-                    actionButton.appendChild(SvgImage.create(SvgImage.Icon.REFRESH));
-                    actionButton.setAttribute(Attribute.UDID, device.udid);
-                    actionButton.setAttribute(Attribute.COMMAND, ControlCenterCommand.UPDATE_INTERFACES);
-                    actionButton.onclick = this.onActionButtonClick;
-                    td.appendChild(actionButton);
-                }
-                selectElement.onchange = this.onInterfaceSelected;
-                td.appendChild(selectElement);
-            } else {
-                td.innerText = value;
+            });
+            card.appendChild(actions);
+            if (extraTools.length) {
+                const secondary = document.createElement('div');
+                secondary.className = 'card-actions secondary';
+                extraTools.forEach((item) => secondary.appendChild(item));
+                card.appendChild(secondary);
             }
-        });
-
-        if (DeviceTracker.CREATE_DIRECT_LINKS) {
-            const name = `${DeviceTracker.AttributePrefixPlayerFor}${fullName}`;
-            StreamClientScrcpy.getPlayers().forEach((playerClass) => {
-                const { playerCodeName, playerFullName } = playerClass;
-                const playerTd = document.createElement('div');
-                playerTd.classList.add(blockClass);
-                playerTd.setAttribute('name', encodeURIComponent(name));
-                playerTd.setAttribute(DeviceTracker.AttributePlayerFullName, encodeURIComponent(playerFullName));
-                playerTd.setAttribute(DeviceTracker.AttributePlayerCodeName, encodeURIComponent(playerCodeName));
-                services.appendChild(playerTd);
-            });
+        } else {
+            const actions = document.createElement('div');
+            actions.className = 'card-actions';
+            const reconnectButton = document.createElement('button');
+            reconnectButton.className = 'card-button-ghost';
+            const reconnecting = this.reconnectingUdids.has(device.udid);
+            reconnectButton.innerText = reconnecting ? 'connecting…' : isUnauthorized ? 'authorize' : 'reconnect';
+            reconnectButton.disabled = reconnecting;
+            reconnectButton.title = isUnauthorized
+                ? 'Reconnect and request authorization on the device'
+                : 'Try to connect to this device';
+            reconnectButton.onclick = () => {
+                this.onReconnectClick(device);
+            };
+            actions.appendChild(reconnectButton);
+            card.appendChild(actions);
         }
 
-        tbody.appendChild(row);
-        if (DeviceTracker.CREATE_DIRECT_LINKS && hasPid && selectedInterfaceUrl) {
-            this.updateLink({
-                url: selectedInterfaceUrl,
-                name: selectedInterfaceName,
-                fullName,
-                udid: device.udid,
-                store: false,
-            });
-        }
+        tbody.appendChild(card);
     }
 
     protected getChannelCode(): string {
@@ -424,6 +420,9 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
 
     public destroy(): void {
         super.destroy();
+        if (this.toastTimer) {
+            clearTimeout(this.toastTimer);
+        }
         DeviceTracker.instancesByUrl.delete(this.url.toString());
         if (!DeviceTracker.instancesByUrl.size) {
             const holder = document.getElementById(BaseDeviceTracker.HOLDER_ELEMENT_ID);

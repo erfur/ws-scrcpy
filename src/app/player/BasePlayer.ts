@@ -526,6 +526,11 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
         ctx.restore();
     }
 
+    // frames decoded during the last second; used by the stream view stats
+    public getCurrentFps(): number {
+        return this.momentumQualityStats ? this.momentumQualityStats.decodedFrames : 0;
+    }
+
     public setShowQualityStats(value: boolean): void {
         this.showQualityStats = value;
         if (!value) {

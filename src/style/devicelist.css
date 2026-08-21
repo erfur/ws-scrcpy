@@ -1,297 +1,309 @@
-:root {
-    --device-border-color: hsl(0, 0%, 82%);
-    --device-list-stripe-color: hsl(0, 0%, 96%);
-    --device-list-default-color: hsl(0, 0%, 100%);
-    --device-list-hover-color: hsl(218, 67%, 95%);
-}
-
-@media (prefers-color-scheme: dark) {
-    :root {
-        --device-border-color: hsl(0, 0%, 32%);
-        --device-list-stripe-color: hsl(0, 0%, 16%);
-        --device-list-default-color: hsl(0, 0%, 14%);
-        --device-list-hover-color: hsl(218, 17%, 18%);
-    }
-}
-
-
 body.list {
     height: auto;
     width: auto;
     overflow: auto;
+    background-color: var(--page-bg);
+    font-family: var(--ui-font);
 }
 
 #devices {
-    padding: 10px 0;
     width: 100%;
-}
-
-body.list #device_list_menu {
-    display: none;
-}
-
-#device_list_menu {
-    display: block;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    z-index: 4;
-}
-
-#devices .device-list button {
-    font-size: var(--font-size);
-    color: var(--button-text-color);
-}
-
-#devices .device-list div.device:nth-child(2n+1){
-    background-color: var(--device-list-default-color);
-}
-
-#devices .device-list div.device:nth-child(2n){
-    background-color: var(--device-list-stripe-color);
-}
-
-#devices .device-header {
-    padding: 2px 0;
-}
-
-#devices .device-header div {
-    display: inline-flex;
-}
-
-#devices .device-name {
-    font-size: 120%;
-}
-
-#devices .device-model {
-    font-size: 110%;
-}
-
-#devices .device-serial {
-    color: var(--url-color);
-    font-size: 80%;
-    margin-left: 6px;
-}
-
-#devices .device-version {
-    font-size: 100%;
-    margin-left: 6px;
-    align-items: baseline;
-}
-
-#devices .device-version .sdk-version {
-    font-size: 75%;
-    color: var(--url-color);
-    margin-left: 0.2em;
-}
-
-#devices .device-state {
-    border-radius: 25px;
-    background-color: red;
-    font-size: 80%;
-    margin-left: 6px;
-    width: 1em;
-    height: 1em;
-}
-
-#devices .device.active .device-state {
-    background-color: green;
+    font-family: var(--ui-font);
 }
 
 #devices .device-list {
-    position: relative;
-    bottom: 0;
-    left: 0;
     width: 100%;
-}
-
-#devices .device-list {
-    border-spacing: 0;
-    border-collapse: collapse;
-    font-family: monospace;
-    font-size: var(--font-size);
-}
-
-#devices .device-list div.device {
-    padding: 5px 12px 5px;
-}
-
-#devices .device-list div.device:hover {
-    background-color: var(--device-list-hover-color)
-}
-
-#devices .device-list div.device select {
-    color: var(--text-color);
-    background-color: var(--main-bg-color);
-    margin-left: 0;
-    border: none;
-}
-
-#devices .device-list div.device:hover select {
-    background-color: var(--device-list-hover-color);;
-}
-
-#devices .device-list div.desc-block {
-    margin: .3em;
-    display: inline-flex;
-}
-
-#devices .device-list div.desc-block.hidden {
-    display: none;
-}
-
-#devices .device-list div.desc-block.stream,
-#devices .device-list div.desc-block.server_pid,
-#devices .device-list div.desc-block.net_interface {
-    border: 1px solid var(--device-border-color);
-    border-radius: .3em;
-    overflow: hidden;
-    white-space: nowrap;
-}
-
-#devices .device-list div.device div.desc-block.stream button.action-button {
-    color: var(--button-text-color);
-}
-
-#devices .device-list div.desc-block button {
-    fill: var(--text-color)
-}
-
-#devices .device-list div.desc-block button > span {
-    padding: 0 .5em;
-}
-
-#devices .device-list div.desc-block button > span,
-#devices .device-list div.desc-block button > svg {
-    vertical-align: middle;
-}
-
-#devices .device-list div.desc-block button > svg {
-    width: var(--font-size);
-    height: var(--font-size);
-}
-
-#devices .device-list div.desc-block button > svg > path {
-    fill: var(--text-color);
-}
-
-#devices .device-list .device.not-active div.desc-block button > svg > path {
-    fill: var(--text-color-light);
-}
-
-#devices .device-list .device.not-active select {
-    color: var(--text-color-light);
-}
-
-#devices .device-list .device.not-active {
-    color: var(--text-color-light);
-}
-
-#devices .device-list .device.not-active a {
-    color: var(--link-color-light);
-}
-
-#devices .device-list .device.not-active a:visited {
-    color: var(--link-color_visited-light);
-}
-
-#devices .device-list div.device div.desc-block .action-button {
-    border: none;
-    background-color: rgba(0, 0, 0, 0);
-    color: inherit;
-}
-
-#devices .device-list div.device div.desc-block .action-button.update-interfaces-button {
-    margin-right: 0;
-}
-
-#devices .device-list div.device div.desc-block .action-button.active {
-    cursor: pointer;
-}
-
-#devices .device-list .device.active div.desc-block .action-button:hover {
-    color: var(--kill-button-hover-color);
-}
-
-#devices .device-list .device.active div.desc-block button.action-button:hover > svg > path {
-    fill: var(--kill-button-hover-color);
 }
 
 #devices .tracker-name {
-    padding: 5px 20px 5px;
-    font-size: larger;
-    font-weight: bolder;
-}
-
-#devices .device-state-label {
-    color: var(--text-color-light);
-    font-size: 80%;
-    margin-left: 6px;
-    text-transform: lowercase;
-}
-
-#devices .device.active .device-state-label {
     display: none;
 }
 
-#devices .device-state[data-state='unauthorized'] {
-    background-color: orange;
+/* header bar */
+
+#devices .list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border-divider);
 }
 
-#devices .device-list div.desc-block.connect {
-    border: 1px solid var(--device-border-color);
-    border-radius: .3em;
-    overflow: hidden;
-    white-space: nowrap;
+#devices .list-header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
 }
 
-#devices .device-list div.device div.desc-block.connect button.action-button {
-    color: var(--button-text-color);
+#devices .list-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-primary);
+    letter-spacing: 0.04em;
 }
 
-#devices .device-list div.device select:empty {
-    display: none;
+#devices .list-count {
+    font-size: 11px;
+    color: var(--ink-faint);
 }
 
 #devices .connect-to-address {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 8px 12px;
+    gap: 8px;
 }
 
 #devices .connect-to-address input {
-    flex: 1 1 auto;
-    min-width: 0;
-    color: var(--text-color);
-    background-color: var(--main-bg-color);
-    border: 1px solid var(--button-border-color);
-    border-radius: .3em;
-    padding: 3px 6px;
-    font-family: monospace;
-    font-size: var(--font-size);
+    width: 180px;
+    padding: 7px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-control);
+    border-radius: 5px;
+    color: var(--ink-primary);
+    font-family: var(--ui-font);
+    font-size: 12px;
+    outline: none;
+}
+
+#devices .connect-to-address input::placeholder {
+    color: var(--ink-faintest);
+}
+
+#devices .connect-to-address input:focus {
+    border-color: var(--border-hover);
 }
 
 #devices .connect-to-address button {
-    flex: 0 0 auto;
-    border: 1px solid var(--device-border-color);
-    border-radius: .3em;
+    padding: 7px 16px;
+    background: var(--accent);
+    border: none;
+    border-radius: 5px;
+    color: #fff;
+    font-family: var(--ui-font);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+#devices .connect-to-address button:hover {
+    background: var(--accent-hover);
+}
+
+/* toast */
+
+#devices .list-toast {
+    margin: 16px 32px 0;
+    padding: 9px 14px;
+    background: var(--accent-tint-bg);
+    border: 1px solid var(--accent-tint-border);
+    border-radius: 5px;
+    font-size: 11.5px;
+    color: var(--accent);
+}
+
+#devices .list-toast.hidden {
+    display: none;
+}
+
+/* card grid */
+
+#devices .device-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+    padding: 22px 32px 30px;
+}
+
+#devices .device-card {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-divider);
+    border-radius: 7px;
+    padding: 16px 18px;
+}
+
+#devices .device-card.offline {
+    background: var(--page-bg);
+    border: 1px dashed var(--border-dashed);
+}
+
+#devices .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+#devices .card-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-primary);
     white-space: nowrap;
-    font-size: var(--font-size);
-    color: var(--button-text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-#devices .connect-to-address button > svg {
-    width: var(--font-size);
-    height: var(--font-size);
-    vertical-align: middle;
+#devices .device-card.offline .card-name {
+    color: var(--ink-faint);
 }
 
-#devices .connect-to-address button > svg > path {
-    fill: var(--text-color);
+#devices .card-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--accent-hover);
+    background: var(--accent-tint-bg);
+    border-radius: 4px;
+    padding: 3px 7px;
+    white-space: nowrap;
 }
 
-#devices .connect-to-address button > span {
-    padding: 0 .5em;
-    vertical-align: middle;
+#devices .card-chip-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-dot);
+}
+
+#devices .device-card.offline .card-chip {
+    color: var(--ink-faint);
+    background: #efeee9;
+}
+
+#devices .device-card.offline .card-chip-dot {
+    background: var(--border-hover);
+}
+
+#devices .device-card[data-state='unauthorized'] .card-chip {
+    color: var(--warn-text);
+    background: var(--warn-bg);
+}
+
+#devices .device-card[data-state='unauthorized'] .card-chip-dot {
+    background: var(--warn-dot);
+}
+
+/* description rows */
+
+#devices .card-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--ink-muted);
+}
+
+#devices .card-row {
+    display: flex;
+    gap: 8px;
+}
+
+#devices .card-row-label {
+    color: var(--ink-faintest);
+    width: 64px;
+    flex: none;
+}
+
+#devices .card-row-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#devices .card-row-value.strong {
+    color: var(--ink-secondary);
+}
+
+#devices .device-card.offline .card-row-value {
+    color: var(--ink-faint);
+}
+
+/* actions */
+
+#devices .card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+#devices .device-card.offline .card-actions {
+    margin-top: auto;
+}
+
+#devices .card-actions.secondary {
+    margin-top: 0;
+}
+
+#devices .card-button-primary {
+    flex: 1;
+    padding: 8px 0;
+    background: var(--accent);
+    border: none;
+    border-radius: 5px;
+    color: #fff;
+    font-family: var(--ui-font);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+#devices .card-button-primary:hover {
+    background: var(--accent-hover);
+}
+
+#devices .card-tool {
+    display: flex;
+}
+
+#devices .card-actions.secondary .card-tool {
+    flex: 1;
+}
+
+#devices .card-tool a {
+    display: block;
+    width: 100%;
+    padding: 8px 11px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-control);
+    border-radius: 5px;
+    color: var(--ink-secondary);
+    font-family: var(--ui-font);
+    font-size: 11.5px;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+#devices .card-tool a:hover,
+#devices .card-tool a:visited {
+    color: var(--ink-secondary);
+}
+
+#devices .card-tool a:hover {
+    border-color: var(--border-hover);
+}
+
+#devices .card-button-ghost {
+    flex: 1;
+    padding: 8px 0;
+    background: transparent;
+    border: 1px solid var(--accent-tint-border);
+    border-radius: 5px;
+    color: var(--accent-hover);
+    font-family: var(--ui-font);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+#devices .card-button-ghost:hover {
+    border-color: var(--accent-hover);
+}
+
+#devices .card-button-ghost:disabled {
+    cursor: default;
+    opacity: 0.8;
 }
