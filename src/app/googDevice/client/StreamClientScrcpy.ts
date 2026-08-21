@@ -23,6 +23,8 @@ import { AppShell } from '../../ui/AppShell';
 import { ACTION } from '../../../common/Action';
 import { StreamReceiverScrcpy } from './StreamReceiverScrcpy';
 import { ScrcpyFilePushStream } from '../filePush/ScrcpyFilePushStream';
+import { DeviceTracker } from './DeviceTracker';
+import { DisplayPowerState } from '../../../common/DisplayPower';
 
 type StartParams = {
     udid: string;
@@ -69,6 +71,9 @@ export class StreamClientScrcpy
     private maxSizeSelect?: HTMLSelectElement;
     private keyboardTrackEl?: HTMLElement;
     private keyboardCaptured = false;
+    private displayButton?: HTMLButtonElement;
+    // last state requested over the stream socket when no tracker is available
+    private fallbackDisplayOn = true;
     private waitingForClipboard = false;
 
     public static registerPlayer(playerClass: PlayerClass): void {
@@ -606,6 +611,14 @@ export class StreamClientScrcpy
             ),
         );
         deviceSection.appendChild(deviceGrid);
+        const displayRow = document.createElement('div');
+        displayRow.className = 'rail-row';
+        this.displayButton = this.buildRailButton('display: —', '', () =>
+            this.toggleDisplayPower(),
+        ) as HTMLButtonElement;
+        displayRow.appendChild(this.displayButton);
+        deviceSection.appendChild(displayRow);
+        this.syncDisplayButton();
         rail.appendChild(deviceSection);
 
         const inputSection = this.buildRailSection('INPUT');
@@ -661,6 +674,60 @@ export class StreamClientScrcpy
         button.innerText = text;
         button.onclick = onClick;
         return button;
+    }
+
+    private getDisplayPowerState(): DisplayPowerState {
+        const tracker = DeviceTracker.findByUdid(this.params.udid);
+        if (tracker) {
+            return tracker.getDescriptorByUdid(this.params.udid)?.displayPower || 'unknown';
+        }
+        return this.fallbackDisplayOn ? 'unknown' : 'off';
+    }
+
+    // Same toggle as on the device card. Goes through the tracker so the server also keeps
+    // the device awake; without a tracker (stream opened on its own) the scrcpy control
+    // message is sent directly over the stream socket instead.
+    private toggleDisplayPower(): void {
+        const { udid } = this.params;
+        const on = this.getDisplayPowerState() === 'off';
+        const tracker = DeviceTracker.findByUdid(udid);
+        if (tracker) {
+            if (tracker.setDisplayPower(udid, on)) {
+                this.showFlash(`display ${on ? 'on' : 'off'}…`);
+            } else {
+                this.showFlash('display toggle unavailable');
+            }
+        } else {
+            this.sendMessage(CommandControlMessage.createSetScreenPowerModeCommand(on));
+            this.fallbackDisplayOn = on;
+            this.showFlash(`display ${on ? 'on' : 'off'}`);
+        }
+        this.syncDisplayButton();
+    }
+
+    private syncDisplayButton(): void {
+        const button = this.displayButton;
+        if (!button) {
+            return;
+        }
+        const tracker = DeviceTracker.findByUdid(this.params.udid);
+        const pending = !!tracker && tracker.isDisplayPowerPending(this.params.udid);
+        const state = this.getDisplayPowerState();
+        const isOff = state === 'off';
+        button.disabled = pending;
+        if (pending) {
+            // while switching, show the state we are heading to
+            button.classList.toggle('state-on', isOff);
+            button.classList.toggle('state-off', !isOff);
+            button.innerText = `display: ${isOff ? 'on' : 'off'}…`;
+            return;
+        }
+        button.classList.toggle('state-on', !isOff);
+        button.classList.toggle('state-off', isOff);
+        button.innerText = `display: ${state === 'unknown' ? '—' : state}`;
+        button.title = isOff
+            ? 'Display is off. Click to turn it back on'
+            : 'Display is on. Click to turn it off; the device stays awake and the stream keeps running';
     }
 
     private pressKey(keyCode: number, label: string): void {
@@ -724,6 +791,7 @@ export class StreamClientScrcpy
             text += ` · ${contentRect.getWidth()}×${contentRect.getHeight()}`;
         }
         this.statsEl.innerText = text;
+        this.syncDisplayButton();
     };
 
     public sendMessage(message: ControlMessage): void {

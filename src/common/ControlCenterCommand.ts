@@ -6,6 +6,7 @@ export class ControlCenterCommand {
     public static UPDATE_INTERFACES = 'update_interfaces';
     public static CONNECT_DEVICE = 'connect_device';
     public static CONFIGURE_STREAM = 'configure_stream';
+    public static SET_DISPLAY_POWER = 'set_display_power';
     public static RUN_WDA = 'run-wda';
     public static REQUEST_WDA = 'request-wda';
 
@@ -44,6 +45,11 @@ export class ControlCenterCommand {
                 command.method = data.method;
                 command.args = data.args;
                 return command;
+            case this.SET_DISPLAY_POWER:
+                if (typeof data.on !== 'boolean') {
+                    throw new Error('Invalid "on" value');
+                }
+                return command;
             case this.START_SERVER:
             case this.UPDATE_INTERFACES:
             case this.CONNECT_DEVICE:
@@ -72,6 +78,10 @@ export class ControlCenterCommand {
     }
     public getData(): any {
         return this.data;
+    }
+    // SET_DISPLAY_POWER: requested display state
+    public isDisplayOn(): boolean {
+        return this.data?.on === true;
     }
     public getArgs(): any {
         return this.args;

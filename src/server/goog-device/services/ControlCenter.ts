@@ -189,6 +189,9 @@ export class ControlCenter extends BaseControlCenter<GoogDeviceDescriptor> imple
             case ControlCenterCommand.CONNECT_DEVICE:
                 await device.triggerConnect();
                 return;
+            case ControlCenterCommand.SET_DISPLAY_POWER:
+                await device.setDisplayPower(command.isDisplayOn());
+                return;
             default:
                 throw new Error(`Unsupported command: "${type}"`);
         }

@@ -1,6 +1,7 @@
 import { ControlMessage } from './ControlMessage';
 import VideoSettings from '../VideoSettings';
 import Util from '../Util';
+import { SCREEN_POWER_MODE_NORMAL, SCREEN_POWER_MODE_OFF } from '../../common/DisplayPower';
 
 export enum FilePushState {
     NEW,
@@ -67,7 +68,7 @@ export class CommandControlMessage extends ControlMessage {
         let offset = 0;
         const buffer = Buffer.alloc(1 + 1);
         offset = buffer.writeInt8(event.type, offset);
-        buffer.writeUInt8(mode ? 1 : 0, offset);
+        buffer.writeUInt8(mode ? SCREEN_POWER_MODE_NORMAL : SCREEN_POWER_MODE_OFF, offset);
         event.buffer = buffer;
         return event;
     }

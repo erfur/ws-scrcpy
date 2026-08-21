@@ -8,6 +8,8 @@ import GoogDeviceDescriptor from '../../types/GoogDeviceDescriptor';
 import { ScrcpyServer } from './ScrcpyServer';
 import { Properties } from './Properties';
 import { DeviceState } from '../../common/DeviceState';
+import { DisplayPowerState } from '../../common/DisplayPower';
+import { ScreenPower } from './ScreenPower';
 import Timeout = NodeJS.Timeout;
 
 enum PID_DETECTION {
@@ -25,6 +27,13 @@ export interface DeviceEvents {
 export class Device extends TypedEmitter<DeviceEvents> {
     private static readonly INITIAL_UPDATE_TIMEOUT = 1500;
     private static readonly MAX_UPDATES_COUNT = 7;
+    // the panel can be switched by hand (power button), so its state is re-read periodically
+    private static readonly DISPLAY_POWER_POLL_INTERVAL = 30000;
+    // BatteryManager.BATTERY_PLUGGED_AC | USB | WIRELESS, what `svc power stayon true` writes
+    private static readonly STAY_ON_WHILE_PLUGGED_IN_ANY = 7;
+    private static readonly SAVED_SCREEN_TIMEOUT_KEY = 'ws_scrcpy_saved_screen_off_timeout';
+    private static readonly NEVER_SCREEN_TIMEOUT = 2147483647; // Integer.MAX_VALUE
+    private static readonly DEFAULT_SCREEN_TIMEOUT = 30000;
     private connected = true;
     private pidDetectionVariant: PID_DETECTION = PID_DETECTION.UNKNOWN;
     private client: AdbKitClient;
@@ -34,6 +43,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
     private updateTimeout = Device.INITIAL_UPDATE_TIMEOUT;
     private updateCount = 0;
     private throttleTimeoutId?: Timeout;
+    private displayPowerTimer?: Timeout;
     private lastEmit = 0;
     public readonly TAG: string;
     public readonly descriptor: GoogDeviceDescriptor;
@@ -47,6 +57,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
             interfaces: [],
             pid: -1,
             batteryLevel: -1,
+            displayPower: 'unknown',
             'wifi.interface': '',
             'ro.build.version.release': '',
             'ro.build.version.sdk': '',
@@ -63,8 +74,11 @@ export class Device extends TypedEmitter<DeviceEvents> {
         if (state === 'device') {
             this.connected = true;
             this.properties = undefined;
+            this.startDisplayPowerPolling();
         } else {
             this.connected = false;
+            this.stopDisplayPowerPolling();
+            this.descriptor.displayPower = 'unknown';
         }
         this.descriptor.state = state;
         this.emitUpdate();
@@ -354,6 +368,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
                 // battery level is informational; its absence must not trigger a retry
                 return true;
             });
+            const displayPowerPromise = this.fetchDisplayPower().then(() => true);
             let pidPromise: Promise<number | undefined>;
             if (this.spawnServer) {
                 pidPromise = this.startServer();
@@ -363,7 +378,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
             const serverPromise = pidPromise.then(() => {
                 return !(this.descriptor.pid === -1 && this.spawnServer);
             });
-            Promise.all([propsPromise, netIntPromise, serverPromise, batteryPromise])
+            Promise.all([propsPromise, netIntPromise, serverPromise, batteryPromise, displayPowerPromise])
                 .then((results) => {
                     this.updateTimeoutId = undefined;
                     const failedCount = results.filter((result) => !result).length;
@@ -461,6 +476,128 @@ export class Device extends TypedEmitter<DeviceEvents> {
             .catch(() => {
                 return -1;
             });
+    }
+
+    private startDisplayPowerPolling(): void {
+        if (this.displayPowerTimer) {
+            return;
+        }
+        this.displayPowerTimer = setInterval(() => {
+            if (this.connected) {
+                this.fetchDisplayPower();
+            }
+        }, Device.DISPLAY_POWER_POLL_INTERVAL);
+    }
+
+    private stopDisplayPowerPolling(): void {
+        if (this.displayPowerTimer) {
+            clearInterval(this.displayPowerTimer);
+            this.displayPowerTimer = undefined;
+        }
+    }
+
+    // SurfaceFlinger is the only place that reflects the panel state set through
+    // the scrcpy power-mode command (the framework still believes the screen is on).
+    public async fetchDisplayPower(): Promise<DisplayPowerState> {
+        return this.runShellCommandAdbKit('dumpsys SurfaceFlinger 2>/dev/null | grep -m1 isPoweredOn')
+            .then((output) => {
+                const match = output.match(/isPoweredOn=([01])/);
+                const state: DisplayPowerState = match ? (match[1] === '1' ? 'on' : 'off') : 'unknown';
+                if (this.descriptor.displayPower !== state) {
+                    this.descriptor.displayPower = state;
+                    this.emitUpdate();
+                }
+                return state;
+            })
+            .catch(() => {
+                return 'unknown' as DisplayPowerState;
+            });
+    }
+
+    private async getSetting(namespace: 'global' | 'system', name: string): Promise<string | null> {
+        const value = (await this.runShellCommandAdbKit(`settings get ${namespace} ${name}`)).trim();
+        return value === 'null' ? null : value;
+    }
+
+    // Some OEM builds deny WRITE_SECURE_SETTINGS/WRITE_SETTINGS to the shell user (and kill
+    // `svc`), so every write is verified by reading the value back and retried as root.
+    private async changeSetting(
+        namespace: 'global' | 'system',
+        name: string,
+        value: string | number | null,
+    ): Promise<void> {
+        const command =
+            value === null ? `settings delete ${namespace} ${name}` : `settings put ${namespace} ${name} ${value}`;
+        const expected = value === null ? null : String(value);
+        const asShell = await this.runShellCommandAdbKit(`${command} 2>&1`);
+        if ((await this.getSetting(namespace, name)) === expected) {
+            return;
+        }
+        const asRoot = await this.runShellCommandAdbKit(`su -c "${command}" 2>&1`);
+        if ((await this.getSetting(namespace, name)) === expected) {
+            return;
+        }
+        const reason = (asShell || asRoot).split('\n')[0].trim() || 'unknown error';
+        throw Error(`failed to change ${namespace} setting "${name}" (as shell and as root): ${reason}`);
+    }
+
+    /**
+     * Keeps the device from falling asleep while its panel is dark (and undoes it later).
+     * "Stay on while plugged in" alone is not enough: devices with a charge limiter can
+     * report "not plugged" while on USB, so the screen timeout is parked at Integer.MAX_VALUE
+     * too. The previous timeout is saved in a global setting on the device itself, so it is
+     * restored by `display on` even after this server restarted in between.
+     */
+    private async keepAwake(enable: boolean): Promise<void> {
+        await this.changeSetting(
+            'global',
+            'stay_on_while_plugged_in',
+            enable ? Device.STAY_ON_WHILE_PLUGGED_IN_ANY : 0,
+        );
+        const saved = await this.getSetting('global', Device.SAVED_SCREEN_TIMEOUT_KEY);
+        if (enable) {
+            if (saved === null) {
+                const current = await this.getSetting('system', 'screen_off_timeout');
+                await this.changeSetting(
+                    'global',
+                    Device.SAVED_SCREEN_TIMEOUT_KEY,
+                    current ?? Device.DEFAULT_SCREEN_TIMEOUT,
+                );
+            }
+            await this.changeSetting('system', 'screen_off_timeout', Device.NEVER_SCREEN_TIMEOUT);
+        } else if (saved !== null) {
+            await this.changeSetting('system', 'screen_off_timeout', saved);
+            await this.changeSetting('global', Device.SAVED_SCREEN_TIMEOUT_KEY, null);
+        }
+    }
+
+    /**
+     * Turns the built-in display off (device stays awake and controllable, like
+     * `scrcpy -Sw`) or back on. Needs the scrcpy server, which is started if missing.
+     */
+    public async setDisplayPower(on: boolean): Promise<void> {
+        if (!this.connected) {
+            throw Error('Device is not connected');
+        }
+        const pid = await this.startServer();
+        if (typeof pid !== 'number') {
+            throw Error('scrcpy server is not running');
+        }
+        // A dark panel is only useful while the device stays awake: without this it falls
+        // asleep after the screen timeout and the next stream wakes it with the panel on.
+        try {
+            await this.keepAwake(!on);
+        } catch (error: any) {
+            console.error(this.TAG, `Display will be turned ${on ? 'on' : 'off'}, but: ${error.message}`);
+        }
+        await ScreenPower.setDisplayOn(this.udid, on);
+        const state = await this.fetchDisplayPower();
+        const expected: DisplayPowerState = on ? 'on' : 'off';
+        if (state !== 'unknown' && state !== expected) {
+            console.error(this.TAG, `Requested display ${expected}, but the panel reports ${state}`);
+        } else {
+            console.log(this.TAG, `Display turned ${expected}`);
+        }
     }
 
     public async killServer(pid: number): Promise<void> {

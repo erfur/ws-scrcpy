@@ -112,6 +112,21 @@ Control your device from `adb shell` in your browser.
 * Battery level and battery, CPU, GPU, skin and modem temperatures, sampled every
 10 seconds for every connected device and kept for 24 hours
 * Live charts with selectable time range, hover readout and a table view
+* The history is persisted as one JSON-lines file per device in `statsDataDir`
+(default `data/stats`, see [config.example.yaml](/config.example.yaml)), so it
+survives restarts; set it to an empty string to keep it in memory only
+
+#### Display on/off
+* `display off` on a device card or in the stream view turns the panel dark while the
+device stays awake and controllable, like `scrcpy --turn-screen-off --stay-awake`
+(the stream keeps running); `display on` restores it
+* The server sends scrcpy's screen power mode command to the device and keeps the
+device from falling asleep while the panel is dark (stay-on-while-plugged-in plus a
+parked screen timeout; the previous timeout is saved on the device and restored by
+`display on`, even across server restarts)
+* The panel state is read back from SurfaceFlinger and shown on the card. Settings
+are written as the shell user and, where an OEM build denies that, retried with
+`su`; without either the panel still toggles but the device may sleep on its timeout
 
 ### iOS
 

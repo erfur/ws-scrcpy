@@ -17,6 +17,8 @@ import { AppShell } from '../../ui/AppShell';
 
 const ADDRESS_PATTERN = /^\d{1,3}(\.\d{1,3}){3}:\d{2,5}$/;
 const TOAST_TIMEOUT = 2500;
+// how long a display toggle may take before the card stops showing it as pending
+const DISPLAY_POWER_TIMEOUT = 12000;
 // tools rendered inline in the card's main actions row, next to `stream`
 const INLINE_TOOLS = ['shell', 'devtools'];
 
@@ -31,6 +33,9 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
     private readonly reconnectingUdids: Set<string> = new Set();
     private readonly pendingStreamUdids: Set<string> = new Set();
     private readonly lastKnownStates: Map<string, string> = new Map();
+    // udid -> requested display state, while the server is switching it
+    private readonly pendingDisplayPower: Map<string, { on: boolean; timer: ReturnType<typeof setTimeout> }> =
+        new Map();
 
     public static start(hostItem: HostItem): DeviceTracker {
         const url = this.buildUrlForTracker(hostItem).toString();
@@ -43,6 +48,16 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
 
     public static getInstance(hostItem: HostItem): DeviceTracker {
         return this.start(hostItem);
+    }
+
+    // The tracker that currently lists `udid` (other views use it to send device commands)
+    public static findByUdid(udid: string): DeviceTracker | undefined {
+        for (const tracker of this.instancesByUrl.values()) {
+            if (tracker.getDescriptorByUdid(udid)) {
+                return tracker;
+            }
+        }
+        return;
     }
 
     protected constructor(params: HostItem, directUrl: string) {
@@ -63,6 +78,7 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
         block.classList.add('tracker-block');
 
         this.handleDeviceStateTransitions();
+        this.reconcilePendingDisplayPower();
 
         block.appendChild(this.buildHeader());
         block.appendChild(this.getOrCreateToast());
@@ -92,6 +108,50 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
             }
             this.lastKnownStates.set(udid, state);
         });
+    }
+
+    // A display toggle is done once the server reports the requested panel state
+    private reconcilePendingDisplayPower(): void {
+        this.pendingDisplayPower.forEach((pending, udid) => {
+            const device = this.getDescriptorByUdid(udid);
+            if (!device) {
+                return;
+            }
+            if (device.displayPower === (pending.on ? 'on' : 'off')) {
+                clearTimeout(pending.timer);
+                this.pendingDisplayPower.delete(udid);
+                this.showToast(`${DeviceTracker.getDeviceName(device)}: display ${pending.on ? 'on' : 'off'}`);
+            }
+        });
+    }
+
+    public isDisplayPowerPending(udid: string): boolean {
+        return this.pendingDisplayPower.has(udid);
+    }
+
+    /**
+     * Ask the server to turn the device display on or off. Returns false when the
+     * request could not be sent. Progress is reflected by `isDisplayPowerPending()`
+     * and the descriptor's `displayPower` field.
+     */
+    public setDisplayPower(udid: string, on: boolean): boolean {
+        if (this.pendingDisplayPower.has(udid)) {
+            return false;
+        }
+        if (!this.sendCommand(ControlCenterCommand.SET_DISPLAY_POWER, udid, { on })) {
+            return false;
+        }
+        const timer = setTimeout(() => {
+            this.pendingDisplayPower.delete(udid);
+            const device = this.getDescriptorByUdid(udid);
+            this.showToast(
+                `${device ? DeviceTracker.getDeviceName(device) : udid}: display did not switch ${on ? 'on' : 'off'}`,
+            );
+            this.buildDeviceTable();
+        }, DISPLAY_POWER_TIMEOUT);
+        this.pendingDisplayPower.set(udid, { on, timer });
+        this.buildDeviceTable();
+        return true;
     }
 
     private buildHeader(): HTMLElement {
@@ -167,7 +227,7 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
         }, TOAST_TIMEOUT);
     }
 
-    private sendCommand(type: string, udid: string): boolean {
+    private sendCommand(type: string, udid: string, extra: Record<string, unknown> = {}): boolean {
         if (!this.ws || this.ws.readyState !== this.ws.OPEN) {
             this.showToast('no connection to the tracker');
             return false;
@@ -177,6 +237,7 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
             type,
             data: {
                 udid,
+                ...extra,
             },
         };
         this.ws.send(JSON.stringify(data));
@@ -217,6 +278,17 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
             return `yesterday ${time}`;
         }
         return `${date.toLocaleDateString()} ${time}`;
+    }
+
+    private static formatDisplayPower(device: GoogDeviceDescriptor): string {
+        switch (device.displayPower) {
+            case 'on':
+                return 'on';
+            case 'off':
+                return 'off';
+            default:
+                return '—';
+        }
     }
 
     private static formatBattery(device: GoogDeviceDescriptor): string {
@@ -346,6 +418,7 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
             const sdk = device['ro.build.version.sdk'];
             rows.appendChild(this.buildCardRow('android', sdk ? `${release} · API ${sdk}` : release));
             rows.appendChild(this.buildCardRow('battery', DeviceTracker.formatBattery(device), 'strong'));
+            rows.appendChild(this.buildCardRow('display', DeviceTracker.formatDisplayPower(device)));
         } else {
             rows.appendChild(
                 this.buildCardRow('last seen', DeviceTracker.formatLastSeen(device['last.update.timestamp'])),
@@ -365,7 +438,7 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
             };
             actions.appendChild(streamButton);
 
-            const extraTools: HTMLElement[] = [];
+            const extraTools: HTMLElement[] = [this.buildDisplayPowerButton(device)];
             DeviceTracker.tools.forEach((tool) => {
                 const entry = tool.createEntryForDeviceList(device, 'card-tool', this.params);
                 if (!entry) {
@@ -414,6 +487,30 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
         tbody.appendChild(card);
     }
 
+    // "display: off" keeps the device awake and controllable with a dark panel (scrcpy -Sw);
+    // the button shows the current state (green = on, gray = off) and toggles it on click
+    private buildDisplayPowerButton(device: GoogDeviceDescriptor): HTMLButtonElement {
+        const button = document.createElement('button');
+        button.className = 'card-tool-button';
+        const pending = this.pendingDisplayPower.get(device.udid);
+        const isOff = device.displayPower === 'off';
+        if (pending) {
+            button.innerText = `display: ${pending.on ? 'on' : 'off'}…`;
+            button.classList.add(pending.on ? 'state-on' : 'state-off');
+            button.disabled = true;
+        } else {
+            button.innerText = `display: ${DeviceTracker.formatDisplayPower(device)}`;
+            button.classList.add(isOff ? 'state-off' : 'state-on');
+            button.title = isOff
+                ? 'Display is off. Click to turn it back on'
+                : 'Display is on. Click to turn it off; the device stays awake and can still be streamed';
+        }
+        button.onclick = () => {
+            this.setDisplayPower(device.udid, isOff);
+        };
+        return button;
+    }
+
     protected getChannelCode(): string {
         return ChannelCode.GTRC;
     }
@@ -423,6 +520,8 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
         if (this.toastTimer) {
             clearTimeout(this.toastTimer);
         }
+        this.pendingDisplayPower.forEach((pending) => clearTimeout(pending.timer));
+        this.pendingDisplayPower.clear();
         DeviceTracker.instancesByUrl.delete(this.url.toString());
         if (!DeviceTracker.instancesByUrl.size) {
             const holder = document.getElementById(BaseDeviceTracker.HOLDER_ELEMENT_ID);
