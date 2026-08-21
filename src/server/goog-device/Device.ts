@@ -46,6 +46,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
             state,
             interfaces: [],
             pid: -1,
+            batteryLevel: -1,
             'wifi.interface': '',
             'ro.build.version.release': '',
             'ro.build.version.sdk': '',
@@ -349,6 +350,10 @@ export class Device extends TypedEmitter<DeviceEvents> {
             const netIntPromise = this.updateInterfaces().then((interfaces) => {
                 return !!interfaces.length;
             });
+            const batteryPromise = this.fetchBatteryLevel().then(() => {
+                // battery level is informational; its absence must not trigger a retry
+                return true;
+            });
             let pidPromise: Promise<number | undefined>;
             if (this.spawnServer) {
                 pidPromise = this.startServer();
@@ -358,7 +363,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
             const serverPromise = pidPromise.then(() => {
                 return !(this.descriptor.pid === -1 && this.spawnServer);
             });
-            Promise.all([propsPromise, netIntPromise, serverPromise])
+            Promise.all([propsPromise, netIntPromise, serverPromise, batteryPromise])
                 .then((results) => {
                     this.updateTimeoutId = undefined;
                     const failedCount = results.filter((result) => !result).length;
@@ -440,6 +445,22 @@ export class Device extends TypedEmitter<DeviceEvents> {
             }
             return this.descriptor.interfaces;
         });
+    }
+
+    public async fetchBatteryLevel(): Promise<number> {
+        return this.runShellCommandAdbKit('dumpsys battery')
+            .then((output) => {
+                const match = output.match(/level:\s*(\d+)/);
+                const level = match ? parseInt(match[1], 10) : -1;
+                if (this.descriptor.batteryLevel !== level) {
+                    this.descriptor.batteryLevel = level;
+                    this.emitUpdate();
+                }
+                return level;
+            })
+            .catch(() => {
+                return -1;
+            });
     }
 
     public async killServer(pid: number): Promise<void> {

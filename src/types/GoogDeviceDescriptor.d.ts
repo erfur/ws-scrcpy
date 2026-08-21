@@ -10,5 +10,7 @@ export default interface GoogDeviceDescriptor extends BaseDeviceDescriptor {
     'wifi.interface': string;
     interfaces: NetInterface[];
     pid: number;
+    // battery charge level in percent, -1 when unknown
+    batteryLevel: number;
     'last.update.timestamp': number;
 }

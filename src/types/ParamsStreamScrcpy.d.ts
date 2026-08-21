@@ -8,4 +8,6 @@ export interface ParamsStreamScrcpy extends ParamsStream {
     fitToScreen?: boolean;
     videoSettings?: VideoSettings;
     captureKeyboard?: boolean;
+    // display name of the device, shown until the stream reports the real one
+    deviceName?: string;
 }

@@ -1,4 +1,29 @@
 :root {
+    /* Minimal light UI design tokens */
+    --ui-font: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --page-bg: #f7f6f3;
+    --stage-bg: #edece7;
+    --card-bg: #ffffff;
+    --ink-primary: #1c1e1c;
+    --ink-secondary: #3f413d;
+    --ink-muted: #6e706a;
+    --ink-faint: #8b8d87;
+    --ink-faintest: #a3a49e;
+    --border-divider: #e4e2dc;
+    --border-control: #ddd9d1;
+    --border-dashed: #d5d2ca;
+    --border-hover: #b8b5ac;
+    --accent: #166e41;
+    --accent-hover: #1a7f4b;
+    --accent-dot: #1a9d5c;
+    --accent-tint-bg: #eaf4ee;
+    --accent-tint-border: #b8d4c3;
+    --warn-text: #a06a1a;
+    --warn-bg: #f6efe2;
+    --warn-dot: #d99a2b;
+    --toggle-off-track: #c9c6be;
+    --flash-bg: #1c1e1c;
+
     --main-bg-color: hsl(0, 0%, 100%);
     --stream-bg-color: hsl(0, 0%, 85%);
     --shell-bg-color: hsl(0, 0%, 0%);
@@ -90,6 +115,12 @@ body.stream {
 
 :focus {
     outline: none;
+}
+
+/* keyboard navigation keeps a visible focus indicator */
+:focus-visible {
+    outline: 2px solid var(--accent-tint-border);
+    outline-offset: 1px;
 }
 
 .flex-center {

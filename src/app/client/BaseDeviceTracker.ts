@@ -48,23 +48,31 @@ export abstract class BaseDeviceTracker<DD extends BaseDeviceDescriptor, TE exte
         return wsUrl;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    public static buildQuery(q: any, params: ParamsDeviceTracker): URLSearchParams {
+        if (params.useProxy) {
+            q.hostname = params.hostname;
+            q.port = params.port;
+            q.pathname = params.pathname ?? location.pathname;
+            q.secure = params.secure;
+            q.useProxy = true;
+        }
+        return new URLSearchParams(q);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public static buildLink(q: any, text: string, params: ParamsDeviceTracker): HTMLAnchorElement {
         let { hostname } = params;
         let port: string | number | undefined = params.port;
         let pathname = params.pathname ?? location.pathname;
         let protocol = params.secure ? 'https:' : 'http:';
+        const query = this.buildQuery(q, params);
         if (params.useProxy) {
-            q.hostname = hostname;
-            q.port = port;
-            q.pathname = pathname;
-            q.secure = params.secure;
-            q.useProxy = true;
             protocol = location.protocol;
             hostname = location.hostname;
             port = location.port;
             pathname = location.pathname;
         }
-        const query = new URLSearchParams(q);
         const hash = `#!${query.toString()}`;
         const a = document.createElement('a');
         a.setAttribute('href', `${protocol}//${hostname}:${port}${pathname}${hash}`);
@@ -141,7 +149,7 @@ export abstract class BaseDeviceTracker<DD extends BaseDeviceDescriptor, TE exte
         parent.insertBefore(nameEl, parent.firstChild);
     }
 
-    private getOrCreateTrackerBlock(parent: Element, controlCenterName: string): Element {
+    protected getOrCreateTrackerBlock(parent: Element, controlCenterName: string): Element {
         let el = document.getElementById(this.elementId);
         if (!el) {
             el = document.createElement('div');
