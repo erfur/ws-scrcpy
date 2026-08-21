@@ -13,4 +13,5 @@ export enum ACTION {
     PROXY_WDA = 'proxy-wda',
     FILE_LISTING = 'list-files',
     APK_INSTALL = 'install-apk',
+    STATS = 'stats',
 }

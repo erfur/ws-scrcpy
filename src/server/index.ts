@@ -65,6 +65,13 @@ async function loadGoogModules() {
     mw2List.push(ApkInstall);
     /// #endif
 
+    /// #if INCLUDE_STATS
+    const { StatsCollector } = await import('./goog-device/services/StatsCollector');
+    const { StatsHistory } = await import('./goog-device/mw/StatsHistory');
+    servicesToStart.push(StatsCollector);
+    mw2List.push(StatsHistory);
+    /// #endif
+
     mwList.push(WebsocketProxyOverAdb);
 }
 loadPlatformModulesPromises.push(loadGoogModules());

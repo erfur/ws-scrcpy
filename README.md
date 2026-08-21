@@ -108,6 +108,11 @@ Control your device from `adb shell` in your browser.
 * Choose `pm install` flags (reinstall, test packages, downgrade, grant permissions)
 * Shows upload progress and the installer output; uploaded files are removed after install
 
+#### Device stats
+* Battery level and battery, CPU, GPU, skin and modem temperatures, sampled every
+10 seconds for every connected device and kept for 24 hours in the server's memory
+* Live charts with selectable time range, hover readout and a table view
+
 ### iOS
 
 ***Experimental Feature***: *is not built by default*
@@ -205,6 +210,7 @@ You can customize project before build by overriding the
 web views on android devices
 * `INCLUDE_FILE_LISTING` - minimalistic [file management](#file-listing)
 * `INCLUDE_APK_INSTALL` - [APK installer](#apk-install)
+* `INCLUDE_STATS` - [device stats](#device-stats) history charts
 * `USE_BROADWAY` - include [Broadway Player](#broadway-player)
 * `USE_H264_CONVERTER` - include [Mse Player](#mse-player)
 * `USE_TINY_H264` - include [TinyH264 Player](#tinyh264-player)

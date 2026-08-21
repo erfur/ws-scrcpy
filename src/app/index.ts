@@ -171,6 +171,26 @@ window.onload = async function (): Promise<void> {
     });
     /// #endif
 
+    /// #if INCLUDE_STATS
+    const { StatsClient } = await import('./googDevice/client/StatsClient');
+    tools.push(StatsClient);
+    AppShell.registerAction(StatsClient.ACTION, (query) => {
+        const params = StatsClient.parseParameters(query);
+        const tab = AppShell.openTab({
+            id: `${StatsClient.ACTION}:${params.udid}`,
+            title: `Stats ${params.udid}`,
+            className: 'stats',
+        });
+        if (!tab.isNew) {
+            return;
+        }
+        const client = StatsClient.start(params);
+        tab.setOnClose(() => {
+            client.destroy();
+        });
+    });
+    /// #endif
+
     /// #if INCLUDE_FILE_LISTING
     const { FileListingClient } = await import('./googDevice/client/FileListingClient');
     tools.push(FileListingClient);

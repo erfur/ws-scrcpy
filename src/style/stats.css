@@ -1,0 +1,335 @@
+/* Device stats view: a card with stacked SVG line plots (one per unit), a value
+   legend and an optional table twin. Palette/ink tokens come from app.css (light UI). */
+
+.app-panel.stats {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    background: var(--page-bg);
+    font-family: var(--ui-font);
+    color: var(--ink-primary);
+}
+
+.stats .stats-wrapper {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    padding: 16px 20px 20px;
+    overflow: auto;
+}
+
+/* toolbar: time range presets first, status, table toggle */
+
+.stats .stats-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.stats .stats-ranges {
+    display: inline-flex;
+    overflow: hidden;
+    background: var(--card-bg);
+    border: 1px solid var(--border-control);
+    border-radius: 5px;
+}
+
+.stats .stats-ranges button {
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    color: var(--ink-secondary);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.stats .stats-ranges button + button {
+    border-left: 1px solid var(--border-divider);
+}
+
+.stats .stats-ranges button:hover {
+    color: var(--ink-primary);
+}
+
+.stats .stats-ranges button.active {
+    background: var(--accent-tint-bg);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.stats .stats-status {
+    margin-left: auto;
+    color: var(--ink-faint);
+    font-size: 11px;
+}
+
+.stats .stats-status.lost {
+    color: var(--warn-text);
+}
+
+.stats .stats-table-toggle {
+    padding: 6px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-control);
+    border-radius: 5px;
+    color: var(--ink-secondary);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.stats .stats-table-toggle:hover {
+    border-color: var(--border-hover);
+}
+
+.stats .stats-table-toggle.active {
+    background: var(--accent-tint-bg);
+    border-color: var(--accent-tint-border);
+    color: var(--accent);
+}
+
+/* chart card */
+
+.stats .stats-card {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 340px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-divider);
+    border-radius: 8px;
+    padding: 12px 12px 8px;
+}
+
+/* the plots take whatever height the panel leaves (the table below caps itself) */
+.stats .stats-chart {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 260px;
+}
+
+.stats .stats-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.stats .stat-grid {
+    stroke: var(--border-divider);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.stats .stat-axis {
+    stroke: var(--border-control);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.stats .stat-tick {
+    fill: var(--ink-faint);
+    font-family: var(--ui-font);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.stats .stat-plot-label {
+    fill: var(--ink-faint);
+    font-family: var(--ui-font);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+}
+
+.stats .stat-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.stats .stat-marker {
+    stroke: var(--card-bg);
+    stroke-width: 2;
+}
+
+.stats .stat-crosshair {
+    stroke: var(--ink-faintest);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.stats .stat-hover-target {
+    fill: transparent;
+    cursor: crosshair;
+}
+
+.stats .stats-empty {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-faint);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+/* hover readout */
+
+.stats .stats-tooltip {
+    position: absolute;
+    z-index: 2;
+    min-width: 160px;
+    padding: 8px 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-control);
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(28, 30, 28, 0.08);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.stats .stats-tooltip.tooltip-hidden {
+    display: none;
+}
+
+.stats .stats-tooltip .tip-time {
+    margin-bottom: 6px;
+    color: var(--ink-faint);
+    font-size: 11px;
+}
+
+.stats .stats-tooltip .tip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1.7;
+}
+
+.stats .stats-tooltip .tip-key {
+    flex: none;
+    width: 14px;
+    height: 2px;
+    border-radius: 1px;
+}
+
+.stats .stats-tooltip .tip-value {
+    min-width: 52px;
+    color: var(--ink-primary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.stats .stats-tooltip .tip-label {
+    color: var(--ink-muted);
+}
+
+/* legend: identity + current value, click to mute a series */
+
+.stats .stats-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    padding: 8px 4px 0;
+}
+
+.stats .stats-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    background: none;
+    border: none;
+    color: var(--ink-secondary);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.stats .stats-legend-item .legend-key {
+    width: 18px;
+    height: 2px;
+    border-radius: 1px;
+}
+
+.stats .stats-legend-item .legend-value {
+    color: var(--ink-primary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.stats .stats-legend-item.no-data .legend-value {
+    color: var(--ink-faintest);
+    font-weight: 400;
+}
+
+.stats .stats-legend-item.muted-series {
+    opacity: 0.45;
+}
+
+.stats .stats-legend-item.muted-series .legend-key {
+    background: var(--ink-faintest) !important;
+}
+
+/* table twin */
+
+.stats .stats-table-wrapper {
+    flex: 0 0 auto;
+    max-height: 45vh;
+    overflow: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border-divider);
+    border-radius: 8px;
+}
+
+.stats .stats-table-wrapper.table-hidden {
+    display: none;
+}
+
+.stats table.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.stats table.stats-table th {
+    position: sticky;
+    top: 0;
+    padding: 8px 12px;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-divider);
+    color: var(--ink-muted);
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.stats table.stats-table th:first-child,
+.stats table.stats-table td:first-child {
+    text-align: left;
+}
+
+.stats table.stats-table td {
+    padding: 5px 12px;
+    border-bottom: 1px solid var(--border-divider);
+    color: var(--ink-secondary);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.stats table.stats-table td.no-value {
+    color: var(--ink-faintest);
+}
+
+.stats .stats-table-note {
+    padding: 8px 12px;
+    color: var(--ink-faint);
+    font-size: 11px;
+}

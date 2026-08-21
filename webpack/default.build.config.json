@@ -10,6 +10,7 @@
   "INCLUDE_ADB_SHELL": true,
   "INCLUDE_FILE_LISTING": true,
   "INCLUDE_APK_INSTALL": true,
+  "INCLUDE_STATS": true,
   "INCLUDE_APPL": false,
   "INCLUDE_GOOG": true,
   "PATHNAME": "/"
