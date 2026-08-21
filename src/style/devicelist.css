@@ -108,7 +108,8 @@ body.list {
 
 #devices .device-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    /* wide enough for three tool links side by side; never wider than the viewport */
+    grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr));
     gap: 14px;
     padding: 22px 32px 30px;
 }
@@ -234,6 +235,8 @@ body.list {
 
 #devices .card-actions.secondary {
     margin-top: 0;
+    /* tools that don't fit on one line wrap instead of spilling out of the card */
+    flex-wrap: wrap;
 }
 
 #devices .card-button-primary {
@@ -255,16 +258,18 @@ body.list {
 
 #devices .card-tool {
     display: flex;
+    min-width: 0;
 }
 
 #devices .card-actions.secondary .card-tool {
-    flex: 1;
+    flex: 1 1 auto;
 }
 
 #devices .card-tool a {
     display: block;
+    box-sizing: border-box;
     width: 100%;
-    padding: 8px 11px;
+    padding: 8px 8px;
     background: var(--card-bg);
     border: 1px solid var(--border-control);
     border-radius: 5px;
