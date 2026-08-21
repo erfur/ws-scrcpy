@@ -36,12 +36,12 @@ export class DevtoolsClient extends ManagerClient<ParamsDevtools, never> {
         this.hiddenInput = document.createElement('input');
         this.hiddenInput.className = 'hidden';
         this.hiddenInput.setAttribute('hidden', 'hidden');
-        document.body.appendChild(this.hiddenInput);
+        this.mountPoint.appendChild(this.hiddenInput);
         this.tooltip = document.createElement('span');
         this.tooltip.innerText = 'Copied!';
         this.tooltip.className = 'tooltip';
         this.tooltip.style.display = 'none';
-        document.body.appendChild(this.tooltip);
+        this.mountPoint.appendChild(this.tooltip);
     }
 
     public static parseParameters(params: URLSearchParams): ParamsDevtools {
@@ -74,9 +74,25 @@ export class DevtoolsClient extends ManagerClient<ParamsDevtools, never> {
 
     protected onSocketClose(event: CloseEvent): void {
         console.error(TAG, `Socket closed. Code: ${event.code}.${event.reason ? ' Reason: ' + event.reason : ''}`);
+        if (this.destroyed) {
+            return;
+        }
         setTimeout(() => {
-            this.openNewConnection();
+            if (!this.destroyed) {
+                this.openNewConnection();
+            }
         }, 2000);
+    }
+
+    public destroy(): void {
+        if (this.destroyed) {
+            return;
+        }
+        super.destroy();
+        if (this.timeout) {
+            clearTimeout(this.timeout);
+            this.timeout = undefined;
+        }
     }
 
     protected onSocketMessage(event: MessageEvent): void {
@@ -348,7 +364,7 @@ export class DevtoolsClient extends ManagerClient<ParamsDevtools, never> {
         if (old) {
             old.parentElement?.replaceChild(block, old);
         } else {
-            document.body.appendChild(block);
+            this.mountPoint.appendChild(block);
         }
     }
 

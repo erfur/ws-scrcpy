@@ -7,6 +7,7 @@ import { TypedEmitter } from '../../common/TypedEmitter';
 import GoogDeviceDescriptor from '../../types/GoogDeviceDescriptor';
 import { ScrcpyServer } from './ScrcpyServer';
 import { Properties } from './Properties';
+import { DeviceState } from '../../common/DeviceState';
 import Timeout = NodeJS.Timeout;
 
 enum PID_DETECTION {
@@ -98,28 +99,46 @@ export class Device extends TypedEmitter<DeviceEvents> {
     }
 
     public async runShellCommandAdb(command: string): Promise<string> {
+        return this.runAdbCommand(['-s', `${this.udid}`, 'shell', command]);
+    }
+
+    // Ask adb to (re-)establish the connection with this device. Works for
+    // devices in any state: an `unauthorized` device gets a new authorization
+    // prompt, a disconnected network device is connected again.
+    public async triggerConnect(): Promise<string> {
+        const isNetworkDevice = this.udid.includes(':');
+        if (isNetworkDevice && this.descriptor.state === DeviceState.DISCONNECTED) {
+            return this.runAdbCommand(['connect', this.udid]);
+        }
+        return this.runAdbCommand(['-s', `${this.udid}`, 'reconnect']);
+    }
+
+    private async runAdbCommand(args: string[]): Promise<string> {
+        return Device.runAdbCommand(this.TAG, args);
+    }
+
+    public static async runAdbCommand(tag: string, args: string[]): Promise<string> {
         return new Promise<string>((resolve, reject) => {
             const cmd = 'adb';
-            const args = ['-s', `${this.udid}`, 'shell', command];
             const adb = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
             let output = '';
 
             adb.stdout.on('data', (data) => {
                 output += data.toString();
-                console.log(this.TAG, `stdout: ${data.toString().replace(/\n$/, '')}`);
+                console.log(tag, `stdout: ${data.toString().replace(/\n$/, '')}`);
             });
 
             adb.stderr.on('data', (data) => {
-                console.error(this.TAG, `stderr: ${data}`);
+                console.error(tag, `stderr: ${data}`);
             });
 
             adb.on('error', (error: Error) => {
-                console.error(this.TAG, `failed to spawn adb process.\n${error.stack}`);
+                console.error(tag, `failed to spawn adb process.\n${error.stack}`);
                 reject(error);
             });
 
             adb.on('close', (code) => {
-                console.log(this.TAG, `adb process (${args.join(' ')}) exited with code ${code}`);
+                console.log(tag, `adb process (${args.join(' ')}) exited with code ${code}`);
                 resolve(output);
             });
         });

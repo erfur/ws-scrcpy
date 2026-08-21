@@ -99,7 +99,7 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
     private channels: Set<Multiplexer> = new Set();
     constructor(params: ParamsFileListing) {
         super(params);
-        this.parent = document.body;
+        this.parent = this.mountPoint;
         this.serial = this.params.udid;
         this.path = this.params.path;
         this.openNewConnection();
@@ -283,6 +283,9 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
             this.filePushHandler.release();
         }
         console.error(this.name, 'socket closed', event.reason);
+        if (this.destroyed) {
+            return;
+        }
         this.addForeground(Foreground.Connect);
     }
 

@@ -11,6 +11,7 @@ import { BaseDeviceTracker } from '../../client/BaseDeviceTracker';
 import Util from '../../Util';
 import { ParamsDeviceTracker } from '../../../types/ParamsDeviceTracker';
 import { ChannelCode } from '../../../common/ChannelCode';
+import { AppShell } from '../../ui/AppShell';
 
 const TAG = '[ShellClient]';
 
@@ -39,7 +40,7 @@ export class ShellClient extends ManagerClient<ParamsShell, never> {
         this.fitAddon = new FitAddon();
         this.term.loadAddon(this.fitAddon);
         this.escapedUdid = Util.escapeUdid(this.udid);
-        this.term.open(ShellClient.getOrCreateContainer(this.escapedUdid));
+        this.term.open(this.getOrCreateContainer(this.escapedUdid));
         this.updateTerminalSize();
         this.term.focus();
     }
@@ -64,6 +65,17 @@ export class ShellClient extends ManagerClient<ParamsShell, never> {
     protected onSocketClose(event: CloseEvent): void {
         console.log(TAG, `Connection closed: ${event.reason}`);
         this.term.dispose();
+        const container = document.getElementById(this.escapedUdid);
+        if (container && this.mountPoint.contains(container)) {
+            AppShell.closeTabForElement(container);
+        }
+    }
+
+    public destroy(): void {
+        if (this.destroyed) {
+            return;
+        }
+        super.destroy();
     }
 
     protected onSocketMessage(): void {
@@ -88,13 +100,13 @@ export class ShellClient extends ManagerClient<ParamsShell, never> {
         this.ws.send(JSON.stringify(message));
     }
 
-    private static getOrCreateContainer(udid: string): HTMLElement {
+    private getOrCreateContainer(udid: string): HTMLElement {
         let container = document.getElementById(udid);
         if (!container) {
             container = document.createElement('div');
             container.className = 'terminal-container';
             container.id = udid;
-            document.body.appendChild(container);
+            this.mountPoint.appendChild(container);
         }
         return container;
     }
@@ -102,7 +114,7 @@ export class ShellClient extends ManagerClient<ParamsShell, never> {
     private updateTerminalSize(): void {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const term: any = this.term;
-        const terminalContainer: HTMLElement = ShellClient.getOrCreateContainer(this.escapedUdid);
+        const terminalContainer: HTMLElement = this.getOrCreateContainer(this.escapedUdid);
         const { rows, cols } = this.fitAddon.proposeDimensions();
         const width =
             (cols * term._core._renderService.dimensions.actualCellWidth + term._core.viewport.scrollBarWidth).toFixed(

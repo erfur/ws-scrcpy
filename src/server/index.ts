@@ -60,6 +60,11 @@ async function loadGoogModules() {
     mw2List.push(FileListing);
     /// #endif
 
+    /// #if INCLUDE_APK_INSTALL
+    const { ApkInstall } = await import('./goog-device/mw/ApkInstall');
+    mw2List.push(ApkInstall);
+    /// #endif
+
     mwList.push(WebsocketProxyOverAdb);
 }
 loadPlatformModulesPromises.push(loadGoogModules());

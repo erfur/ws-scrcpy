@@ -1,5 +1,6 @@
 export enum ChannelCode {
     FSLS = 'FSLS', // File System LiSt
+    APKI = 'APKI', // APK Install
     HSTS = 'HSTS', // HoSTS List
     SHEL = 'SHEL', // SHELl
     GTRC = 'GTRC', // Goog device TRaCer

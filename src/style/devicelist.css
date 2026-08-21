@@ -22,19 +22,8 @@ body.list {
 }
 
 #devices {
-    padding: 20px 0;
+    padding: 10px 0;
     width: 100%;
-    height: calc(100% - 40px);
-    overflow-y: auto;
-}
-
-body.stream #devices {
-    background-color: var(--device-list-default-color);
-    opacity: .8;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 3;
 }
 
 body.list #device_list_menu {
@@ -124,7 +113,7 @@ body.list #device_list_menu {
 }
 
 #devices .device-list div.device {
-    padding: 5px 20px 5px;
+    padding: 5px 12px 5px;
 }
 
 #devices .device-list div.device:hover {
@@ -232,4 +221,77 @@ body.list #device_list_menu {
     padding: 5px 20px 5px;
     font-size: larger;
     font-weight: bolder;
+}
+
+#devices .device-state-label {
+    color: var(--text-color-light);
+    font-size: 80%;
+    margin-left: 6px;
+    text-transform: lowercase;
+}
+
+#devices .device.active .device-state-label {
+    display: none;
+}
+
+#devices .device-state[data-state='unauthorized'] {
+    background-color: orange;
+}
+
+#devices .device-list div.desc-block.connect {
+    border: 1px solid var(--device-border-color);
+    border-radius: .3em;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+#devices .device-list div.device div.desc-block.connect button.action-button {
+    color: var(--button-text-color);
+}
+
+#devices .device-list div.device select:empty {
+    display: none;
+}
+
+#devices .connect-to-address {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 12px;
+}
+
+#devices .connect-to-address input {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-color);
+    background-color: var(--main-bg-color);
+    border: 1px solid var(--button-border-color);
+    border-radius: .3em;
+    padding: 3px 6px;
+    font-family: monospace;
+    font-size: var(--font-size);
+}
+
+#devices .connect-to-address button {
+    flex: 0 0 auto;
+    border: 1px solid var(--device-border-color);
+    border-radius: .3em;
+    white-space: nowrap;
+    font-size: var(--font-size);
+    color: var(--button-text-color);
+}
+
+#devices .connect-to-address button > svg {
+    width: var(--font-size);
+    height: var(--font-size);
+    vertical-align: middle;
+}
+
+#devices .connect-to-address button > svg > path {
+    fill: var(--text-color);
+}
+
+#devices .connect-to-address button > span {
+    padding: 0 .5em;
+    vertical-align: middle;
 }

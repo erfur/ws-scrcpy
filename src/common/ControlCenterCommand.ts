@@ -4,6 +4,7 @@ export class ControlCenterCommand {
     public static KILL_SERVER = 'kill_server';
     public static START_SERVER = 'start_server';
     public static UPDATE_INTERFACES = 'update_interfaces';
+    public static CONNECT_DEVICE = 'connect_device';
     public static CONFIGURE_STREAM = 'configure_stream';
     public static RUN_WDA = 'run-wda';
     public static REQUEST_WDA = 'request-wda';
@@ -45,6 +46,7 @@ export class ControlCenterCommand {
                 return command;
             case this.START_SERVER:
             case this.UPDATE_INTERFACES:
+            case this.CONNECT_DEVICE:
             case this.CONFIGURE_STREAM:
             case this.RUN_WDA:
                 return command;

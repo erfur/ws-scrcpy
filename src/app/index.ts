@@ -2,8 +2,11 @@ import '../style/app.css';
 import { StreamClientScrcpy } from './googDevice/client/StreamClientScrcpy';
 import { HostTracker } from './client/HostTracker';
 import { Tool } from './client/Tool';
+import { AppShell } from './ui/AppShell';
 
 window.onload = async function (): Promise<void> {
+    AppShell.init();
+
     const hash = location.hash.replace(/^#!/, '');
     const parsedQuery = new URLSearchParams(hash);
     const action = parsedQuery.get('action');
@@ -28,10 +31,21 @@ window.onload = async function (): Promise<void> {
     StreamClientScrcpy.registerPlayer(WebCodecsPlayer);
     /// #endif
 
-    if (action === StreamClientScrcpy.ACTION && typeof parsedQuery.get('udid') === 'string') {
-        StreamClientScrcpy.start(parsedQuery);
-        return;
-    }
+    AppShell.registerAction(StreamClientScrcpy.ACTION, (query) => {
+        const params = StreamClientScrcpy.parseParameters(query);
+        const tab = AppShell.openTab({
+            id: `${StreamClientScrcpy.ACTION}:${params.udid}`,
+            title: `Stream ${params.udid}`,
+            className: 'stream',
+        });
+        if (!tab.isNew) {
+            return;
+        }
+        const client = StreamClientScrcpy.start(params);
+        tab.setOnClose(() => {
+            client.stop();
+        });
+    });
 
     /// #if INCLUDE_APPL
     {
@@ -52,10 +66,21 @@ window.onload = async function (): Promise<void> {
         StreamClientQVHack.registerPlayer(MsePlayerForQVHack);
         /// #endif
 
-        if (action === StreamClientQVHack.ACTION && typeof parsedQuery.get('udid') === 'string') {
-            StreamClientQVHack.start(StreamClientQVHack.parseParameters(parsedQuery));
-            return;
-        }
+        AppShell.registerAction(StreamClientQVHack.ACTION, (query) => {
+            const params = StreamClientQVHack.parseParameters(query);
+            const tab = AppShell.openTab({
+                id: `${StreamClientQVHack.ACTION}:${params.udid}`,
+                title: `Stream ${params.udid}`,
+                className: 'stream',
+            });
+            if (!tab.isNew) {
+                return;
+            }
+            const client = StreamClientQVHack.start(params);
+            tab.setOnClose(() => {
+                client.onStop();
+            });
+        });
         /// #endif
 
         /// #if USE_WDA_MJPEG_SERVER
@@ -65,10 +90,21 @@ window.onload = async function (): Promise<void> {
         const { MjpegPlayer } = await import('./player/MjpegPlayer');
         StreamClientMJPEG.registerPlayer(MjpegPlayer);
 
-        if (action === StreamClientMJPEG.ACTION && typeof parsedQuery.get('udid') === 'string') {
-            StreamClientMJPEG.start(StreamClientMJPEG.parseParameters(parsedQuery));
-            return;
-        }
+        AppShell.registerAction(StreamClientMJPEG.ACTION, (query) => {
+            const params = StreamClientMJPEG.parseParameters(query);
+            const tab = AppShell.openTab({
+                id: `${StreamClientMJPEG.ACTION}:${params.udid}`,
+                title: `Stream ${params.udid}`,
+                className: 'stream',
+            });
+            if (!tab.isNew) {
+                return;
+            }
+            const client = StreamClientMJPEG.start(params);
+            tab.setOnClose(() => {
+                client.onStop();
+            });
+        });
         /// #endif
     }
     /// #endif
@@ -77,29 +113,82 @@ window.onload = async function (): Promise<void> {
 
     /// #if INCLUDE_ADB_SHELL
     const { ShellClient } = await import('./googDevice/client/ShellClient');
-    if (action === ShellClient.ACTION && typeof parsedQuery.get('udid') === 'string') {
-        ShellClient.start(ShellClient.parseParameters(parsedQuery));
-        return;
-    }
     tools.push(ShellClient);
+    AppShell.registerAction(ShellClient.ACTION, (query) => {
+        const params = ShellClient.parseParameters(query);
+        const tab = AppShell.openTab({
+            id: `${ShellClient.ACTION}:${params.udid}`,
+            title: `Shell ${params.udid}`,
+            className: 'shell',
+        });
+        if (!tab.isNew) {
+            return;
+        }
+        const client = ShellClient.start(params);
+        tab.setOnClose(() => {
+            client.destroy();
+        });
+    });
     /// #endif
 
     /// #if INCLUDE_DEV_TOOLS
     const { DevtoolsClient } = await import('./googDevice/client/DevtoolsClient');
-    if (action === DevtoolsClient.ACTION) {
-        DevtoolsClient.start(DevtoolsClient.parseParameters(parsedQuery));
-        return;
-    }
     tools.push(DevtoolsClient);
+    AppShell.registerAction(DevtoolsClient.ACTION, (query) => {
+        const params = DevtoolsClient.parseParameters(query);
+        const tab = AppShell.openTab({
+            id: `${DevtoolsClient.ACTION}:${params.udid}`,
+            title: `DevTools ${params.udid}`,
+            className: 'devtools',
+        });
+        if (!tab.isNew) {
+            return;
+        }
+        const client = DevtoolsClient.start(params);
+        tab.setOnClose(() => {
+            client.destroy();
+        });
+    });
+    /// #endif
+
+    /// #if INCLUDE_APK_INSTALL
+    const { ApkInstallClient } = await import('./googDevice/client/ApkInstallClient');
+    tools.push(ApkInstallClient);
+    AppShell.registerAction(ApkInstallClient.ACTION, (query) => {
+        const params = ApkInstallClient.parseParameters(query);
+        const tab = AppShell.openTab({
+            id: `${ApkInstallClient.ACTION}:${params.udid}`,
+            title: `Install APK ${params.udid}`,
+            className: 'apk-install',
+        });
+        if (!tab.isNew) {
+            return;
+        }
+        const client = ApkInstallClient.start(params);
+        tab.setOnClose(() => {
+            client.destroy();
+        });
+    });
     /// #endif
 
     /// #if INCLUDE_FILE_LISTING
     const { FileListingClient } = await import('./googDevice/client/FileListingClient');
-    if (action === FileListingClient.ACTION) {
-        FileListingClient.start(FileListingClient.parseParameters(parsedQuery));
-        return;
-    }
     tools.push(FileListingClient);
+    AppShell.registerAction(FileListingClient.ACTION, (query) => {
+        const params = FileListingClient.parseParameters(query);
+        const tab = AppShell.openTab({
+            id: `${FileListingClient.ACTION}:${params.udid}`,
+            title: `Files ${params.udid}`,
+            className: 'file-listing',
+        });
+        if (!tab.isNew) {
+            return;
+        }
+        const client = FileListingClient.start(params);
+        tab.setOnClose(() => {
+            client.destroy();
+        });
+    });
     /// #endif
 
     if (tools.length) {
@@ -109,4 +198,9 @@ window.onload = async function (): Promise<void> {
         });
     }
     HostTracker.start();
+
+    // support deep links from the pre-SPA hash-based URLs
+    if (action) {
+        AppShell.route(parsedQuery);
+    }
 };

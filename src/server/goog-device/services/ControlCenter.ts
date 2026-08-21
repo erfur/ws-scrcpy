@@ -90,6 +90,9 @@ export class ControlCenter extends BaseControlCenter<GoogDeviceDescriptor> imple
             device = new Device(udid, state);
             device.on('update', this.onDeviceUpdate);
             this.deviceMap.set(udid, device);
+            // the constructor emits its first update before the listener is
+            // attached: register and broadcast the initial descriptor manually
+            this.onDeviceUpdate(device);
         }
     }
 
@@ -137,6 +140,10 @@ export class ControlCenter extends BaseControlCenter<GoogDeviceDescriptor> imple
         return this.deviceMap.get(udid);
     }
 
+    private isNetworkAddress(udid: string): boolean {
+        return /^[a-zA-Z0-9._[\]-]+:\d{1,5}$/.test(udid);
+    }
+
     public getId(): string {
         return this.id;
     }
@@ -159,6 +166,12 @@ export class ControlCenter extends BaseControlCenter<GoogDeviceDescriptor> imple
         const udid = command.getUdid();
         const device = this.getDevice(udid);
         if (!device) {
+            // `connect` may target a network device this adb server has never
+            // seen yet (e.g. a phone in tcpip mode on the local network)
+            if (command.getType() === ControlCenterCommand.CONNECT_DEVICE && this.isNetworkAddress(udid)) {
+                await Device.runAdbCommand(`[connect ${udid}]`, ['connect', udid]);
+                return;
+            }
             console.error(`Device with udid:"${udid}" not found`);
             return;
         }
@@ -172,6 +185,9 @@ export class ControlCenter extends BaseControlCenter<GoogDeviceDescriptor> imple
                 return;
             case ControlCenterCommand.UPDATE_INTERFACES:
                 await device.updateInterfaces();
+                return;
+            case ControlCenterCommand.CONNECT_DEVICE:
+                await device.triggerConnect();
                 return;
             default:
                 throw new Error(`Unsupported command: "${type}"`);

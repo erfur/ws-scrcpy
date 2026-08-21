@@ -1,0 +1,180 @@
+body.app-shell {
+    color: var(--text-color);
+    background-color: var(--main-bg-color);
+    position: absolute;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+#app {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+#app-sidebar {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    width: 22rem;
+    max-width: 50%;
+    border-right: 1px solid var(--button-border-color);
+    background-color: var(--header-bg-color);
+    overflow: hidden;
+    transition: width 0.15s ease-out;
+}
+
+#app-sidebar.collapsed {
+    width: 0;
+    border-right: none;
+}
+
+#app-sidebar .sidebar-header {
+    flex: 0 0 auto;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--button-border-color);
+    white-space: nowrap;
+}
+
+#app-sidebar .app-title {
+    font-size: 1.15rem;
+    font-weight: bold;
+}
+
+#app-device-list {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#app-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#app-tab-bar {
+    display: flex;
+    align-items: stretch;
+    flex: 0 0 auto;
+    min-height: 2.3rem;
+    background-color: var(--header-bg-color);
+    border-bottom: 1px solid var(--button-border-color);
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+#app-sidebar-toggle {
+    flex: 0 0 auto;
+    border: none;
+    background: none;
+    color: var(--text-color);
+    font-size: 1.1rem;
+    padding: 0 0.8rem;
+    cursor: pointer;
+}
+
+#app-sidebar-toggle:hover {
+    background-color: var(--controls-bg-color);
+}
+
+.app-tab {
+    display: flex;
+    align-items: center;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 15rem;
+    padding: 0 0.3rem 0 0.8rem;
+    border-right: 1px solid var(--button-border-color);
+    cursor: pointer;
+    user-select: none;
+}
+
+.app-tab:hover {
+    background-color: var(--controls-bg-color);
+}
+
+.app-tab.active {
+    background-color: var(--main-bg-color);
+}
+
+.app-tab-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-tab-close {
+    flex: 0 0 auto;
+    border: none;
+    background: none;
+    color: var(--text-color-light);
+    font-size: 1rem;
+    margin-left: 0.3rem;
+    padding: 0 0.3rem;
+    cursor: pointer;
+}
+
+.app-tab-close:hover {
+    color: var(--kill-button-hover-color);
+}
+
+#app-panels {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.app-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+}
+
+.app-panel.hidden {
+    display: none;
+}
+
+.app-panel.shell {
+    background-color: var(--shell-bg-color);
+    overflow: hidden;
+}
+
+.app-panel.stream {
+    background-color: var(--stream-bg-color);
+    overflow: hidden;
+}
+
+.app-panel.file-listing {
+    padding: 0 1rem;
+}
+
+.app-panel.devtools {
+    padding: 0 1rem;
+}
+
+#app-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#app-placeholder.hidden {
+    display: none;
+}
+
+#app-placeholder .placeholder-message {
+    color: var(--text-color-light);
+    font-size: 1.2rem;
+}

@@ -14,6 +14,7 @@ import { ParamsDeviceTracker } from '../../../types/ParamsDeviceTracker';
 import { DeviceTracker } from './DeviceTracker';
 import { WdaStatus } from '../../../common/WdaStatus';
 import { MessageRunWdaResponse } from '../../../types/MessageRunWdaResponse';
+import { AppShell } from '../../ui/AppShell';
 
 const WAIT_CLASS = 'wait';
 const TAG = 'StreamClient';
@@ -136,7 +137,10 @@ export abstract class StreamClient<T extends ParamsStream> extends BaseClient<T,
     }
 
     public getMaxSize(controlButtons: HTMLElement): Size | undefined {
-        return StreamClient.getMaxSize(controlButtons);
+        const holder = this.mountPoint;
+        const width = (holder.clientWidth - controlButtons.clientWidth) & ~15;
+        const height = holder.clientHeight & ~15;
+        return new Size(width, height);
     }
 
     protected async runWebDriverAgent(): Promise<void> {
@@ -190,6 +194,7 @@ export abstract class StreamClient<T extends ParamsStream> extends BaseClient<T,
         }
         this.wdaProxy.stop();
         this.player?.stop();
+        AppShell.closeTabForElement(this.mountPoint);
     }
 
     public setWdaStatusNotification(status: WdaStatus): void {
@@ -233,7 +238,7 @@ export abstract class StreamClient<T extends ParamsStream> extends BaseClient<T,
         player.setParent(this.videoWrapper);
         player.on('input-video-resize', this.onInputVideoResize);
 
-        document.body.appendChild(deviceView);
+        this.mountPoint.appendChild(deviceView);
         const bounds = this.getMaxSize(controlButtons);
         if (bounds) {
             player.setBounds(bounds);

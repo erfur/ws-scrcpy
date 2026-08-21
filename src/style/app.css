@@ -103,8 +103,10 @@ body.stream {
 
 .device-view {
     z-index: 1;
-    float: right;
-    display: inline-block;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: flex-start;
 }
 
 .video-layer {
@@ -118,7 +120,7 @@ body.stream {
 }
 
 .video {
-    float: right;
+    order: 0;
     max-height: 100%;
     max-width: 100%;
     background-color: #000000;
@@ -126,7 +128,8 @@ body.stream {
 
 
 .control-buttons-list {
-    float: right;
+    order: 1;
+    flex: 0 0 auto;
     width: 3.715rem;
     background-color: var(--control-buttons-bg-color);
 }

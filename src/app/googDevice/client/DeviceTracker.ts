@@ -36,6 +36,7 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
     private static instancesByUrl: Map<string, DeviceTracker> = new Map();
     protected static tools: Set<Tool> = new Set();
     protected tableId = 'goog_device_list';
+    private connectForm?: HTMLElement;
 
     public static start(hostItem: HostItem): DeviceTracker {
         const url = this.buildUrlForTracker(hostItem).toString();
@@ -59,6 +60,53 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
 
     protected onSocketOpen(): void {
         // nothing here;
+    }
+
+    protected buildDeviceTable(): void {
+        super.buildDeviceTable();
+        const block = document.getElementById(this.elementId);
+        if (block) {
+            block.appendChild(this.getOrCreateConnectForm());
+        }
+    }
+
+    private getOrCreateConnectForm(): HTMLElement {
+        if (this.connectForm) {
+            return this.connectForm;
+        }
+        const form = document.createElement('form');
+        form.className = 'connect-to-address';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'device address (ip:port)';
+        input.title = 'Connect to a network device, e.g. 192.168.0.42:5555';
+        form.appendChild(input);
+        const button = document.createElement('button');
+        button.type = 'submit';
+        button.className = 'action-button active';
+        button.appendChild(SvgImage.create(SvgImage.Icon.REFRESH));
+        const span = document.createElement('span');
+        span.innerText = 'connect';
+        button.appendChild(span);
+        form.appendChild(button);
+        form.onsubmit = (event: Event): void => {
+            event.preventDefault();
+            const address = input.value.trim();
+            if (!address || !this.ws || this.ws.readyState !== this.ws.OPEN) {
+                return;
+            }
+            const data: Message = {
+                id: this.getNextId(),
+                type: ControlCenterCommand.CONNECT_DEVICE,
+                data: {
+                    udid: address,
+                },
+            };
+            this.ws.send(JSON.stringify(data));
+            input.value = '';
+        };
+        this.connectForm = form;
+        return form;
     }
 
     protected setIdAndHostName(id: string, hostName: string): void {
@@ -178,21 +226,46 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
         const isActive = device.state === DeviceState.DEVICE;
         let hasPid = false;
         const servicesId = `device_services_${fullName}`;
+        const productName = `${device['ro.product.manufacturer']} ${device['ro.product.model']}`.trim();
+        const deviceName = productName || device.udid;
         const row = html`<div class="device ${isActive ? 'active' : 'not-active'}">
             <div class="device-header">
-                <div class="device-name">${device['ro.product.manufacturer']} ${device['ro.product.model']}</div>
-                <div class="device-serial">${device.udid}</div>
+                <div class="device-name">${deviceName}</div>
+                <div class="device-serial">${productName ? device.udid : ''}</div>
                 <div class="device-version">
                     <div class="release-version">${device['ro.build.version.release']}</div>
                     <div class="sdk-version">${device['ro.build.version.sdk']}</div>
                 </div>
                 <div class="device-state" title="State: ${device.state}"></div>
+                <div class="device-state-label">${isActive ? '' : device.state}</div>
             </div>
             <div id="${servicesId}" class="services"></div>
         </div>`.content;
+        const stateEl = row.querySelector('.device-state');
+        stateEl?.setAttribute('data-state', device.state);
         const services = row.getElementById(servicesId);
         if (!services) {
             return;
+        }
+
+        if (!isActive) {
+            const connectTd = document.createElement('div');
+            connectTd.classList.add('connect', blockClass);
+            const connectButton = document.createElement('button');
+            connectButton.className = 'action-button connect-button active';
+            connectButton.title =
+                device.state === DeviceState.UNAUTHORIZED
+                    ? 'Reconnect and request authorization on the device'
+                    : 'Try to connect to this device';
+            connectButton.setAttribute(Attribute.UDID, device.udid);
+            connectButton.setAttribute(Attribute.COMMAND, ControlCenterCommand.CONNECT_DEVICE);
+            connectButton.onclick = this.onActionButtonClick;
+            connectButton.appendChild(SvgImage.create(SvgImage.Icon.REFRESH));
+            const span = document.createElement('span');
+            span.innerText = 'connect';
+            connectButton.appendChild(span);
+            connectTd.appendChild(connectButton);
+            services.appendChild(connectTd);
         }
 
         DeviceTracker.tools.forEach((tool) => {

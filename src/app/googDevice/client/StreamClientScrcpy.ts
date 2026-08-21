@@ -25,7 +25,7 @@ import {
 import DeviceMessage from '../DeviceMessage';
 import { DisplayInfo } from '../../DisplayInfo';
 import { Attribute } from '../../Attribute';
-import { HostTracker } from '../../client/HostTracker';
+import { AppShell } from '../../ui/AppShell';
 import { ACTION } from '../../../common/Action';
 import { StreamReceiverScrcpy } from './StreamReceiverScrcpy';
 import { ParamsDeviceTracker } from '../../../types/ParamsDeviceTracker';
@@ -59,6 +59,7 @@ export class StreamClientScrcpy
     private player?: BasePlayer;
     private filePushHandler?: FilePushHandler;
     private fitToScreen?: boolean;
+    private stopHandler?: (ev?: string | Event) => void;
     private readonly streamReceiver: StreamReceiverScrcpy;
 
     public static registerPlayer(playerClass: PlayerClass): void {
@@ -294,7 +295,12 @@ export class StreamClientScrcpy
 
         const deviceView = document.createElement('div');
         deviceView.className = 'device-view';
+        let stopped = false;
         const stop = (ev?: string | Event) => {
+            if (stopped) {
+                return;
+            }
+            stopped = true;
             if (ev && ev instanceof Event && ev.type === 'error') {
                 console.error(TAG, ev);
             }
@@ -311,7 +317,9 @@ export class StreamClientScrcpy
             if (this.player) {
                 this.player.stop();
             }
+            AppShell.closeTabForElement(this.mountPoint);
         };
+        this.stopHandler = stop;
 
         const googMoreBox = (this.moreBox = new GoogMoreBox(udid, player, this));
         const moreBox = googMoreBox.getHolderElement();
@@ -328,7 +336,7 @@ export class StreamClientScrcpy
         player.setParent(video);
         player.pause();
 
-        document.body.appendChild(deviceView);
+        this.mountPoint.appendChild(deviceView);
         if (fitToScreen) {
             const newBounds = this.getMaxSize();
             if (newBounds) {
@@ -387,10 +395,16 @@ export class StreamClientScrcpy
         if (!this.controlButtons) {
             return;
         }
-        const body = document.body;
-        const width = (body.clientWidth - this.controlButtons.clientWidth) & ~15;
-        const height = body.clientHeight & ~15;
+        const holder = this.mountPoint === document.body ? document.body : this.mountPoint;
+        const width = (holder.clientWidth - this.controlButtons.clientWidth) & ~15;
+        const height = holder.clientHeight & ~15;
         return new Size(width, height);
+    }
+
+    public stop(): void {
+        if (this.stopHandler) {
+            this.stopHandler();
+        }
     }
 
     private setTouchListeners(player: BasePlayer): void {
@@ -500,8 +514,5 @@ export class StreamClientScrcpy
 
     private static onConfigureDialogClosed = (event: { dialog: ConfigureScrcpy; result: boolean }): void => {
         event.dialog.off('closed', StreamClientScrcpy.onConfigureDialogClosed);
-        if (event.result) {
-            HostTracker.getInstance().destroy();
-        }
     };
 }

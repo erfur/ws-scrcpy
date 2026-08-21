@@ -1,0 +1,186 @@
+.app-panel.apk-install {
+    padding: 0 1rem;
+}
+
+.apk-install .apk-install-wrapper {
+    margin: 8px;
+}
+
+.apk-install h1 {
+    border-bottom: 1px solid var(--button-border-color);
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    white-space: nowrap;
+}
+
+.apk-install .drop-zone {
+    border: 2px dashed var(--button-border-color);
+    border-radius: 0.5em;
+    padding: 2em 1em;
+    text-align: center;
+    color: var(--text-color-light);
+    cursor: pointer;
+    user-select: none;
+}
+
+.apk-install .drop-zone:hover,
+.apk-install .drop-zone:focus-visible {
+    border-color: var(--link-color);
+    color: var(--text-color);
+}
+
+.apk-install .drop-zone input[type='file'] {
+    display: none;
+}
+
+.apk-install .drop-zone code {
+    font-family: monospace;
+}
+
+.apk-install .install-options {
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    border: 1px solid var(--button-border-color);
+    border-radius: 0.3em;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em 2em;
+}
+
+.apk-install .install-options legend {
+    padding: 0 0.5em;
+    color: var(--text-color-light);
+}
+
+.apk-install .install-options label {
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.apk-install .install-options label code {
+    color: var(--text-color-light);
+    font-family: monospace;
+}
+
+.apk-install table.installs {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.apk-install table.installs th {
+    text-align: left;
+    border-bottom: 1px solid var(--button-border-color);
+    padding: 0.3em 0.5em;
+}
+
+.apk-install table.installs td {
+    padding: 0.3em 0.5em;
+    vertical-align: top;
+}
+
+.apk-install table.installs td.file-size {
+    white-space: nowrap;
+    color: var(--text-color-light);
+}
+
+.apk-install table.installs tr:hover {
+    background-color: var(--controls-bg-color);
+}
+
+.apk-install table.installs td.status {
+    position: relative;
+    width: 50%;
+}
+
+.apk-install table.installs .status-text {
+    position: relative;
+    word-break: break-word;
+}
+
+.apk-install table.installs .status-text.success {
+    color: var(--svg-checkbox-bg-color);
+}
+
+.apk-install table.installs .status-text.error {
+    color: var(--kill-button-hover-color);
+}
+
+.apk-install .background-progress {
+    position: absolute;
+    left: 0;
+    top: 0;
+    background-color: var(--progress-background-color);
+    height: 100%;
+    width: 0;
+    margin: 0;
+    padding: 0;
+    transition: width 0.1s linear;
+}
+
+.apk-install .background-progress.error {
+    background-color: var(--progress-background-error-color);
+}
+
+.apk-install .background-progress.installing {
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 8px,
+        rgba(255, 255, 255, 0.25) 8px,
+        rgba(255, 255, 255, 0.25) 16px
+    );
+    background-size: 200% 100%;
+    animation: apk-install-stripes 1s linear infinite;
+}
+
+@keyframes apk-install-stripes {
+    from {
+        background-position: 0 0;
+    }
+    to {
+        background-position: 45px 0;
+    }
+}
+
+.apk-install table.installs pre.install-log {
+    margin: 0.3em 0 0;
+    padding: 0.5em;
+    max-height: 12em;
+    overflow: auto;
+    font-family: monospace;
+    font-size: 0.9em;
+    white-space: pre-wrap;
+    background-color: var(--header-bg-color);
+    border-radius: 0.3em;
+}
+
+.apk-install table.installs a.toggle-log {
+    margin-left: 0.5em;
+    font-size: 0.9em;
+}
+
+.apk-install .foreground {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    z-index: 1000;
+    background-color: var(--controls-bg-color);
+}
+
+.apk-install .foreground-message {
+    flex: auto;
+    font-size: 30px;
+    color: #999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px;
+    pointer-events: none;
+}
+
+.apk-install .foreground-message.drop-target-message {
+    border: 4px dashed #ddd;
+}

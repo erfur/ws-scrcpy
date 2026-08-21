@@ -1,0 +1,30 @@
+services:
+  ws-scrcpy:
+    build: .
+    image: ws-scrcpy:local
+    container_name: ws-scrcpy
+    restart: unless-stopped
+    ports:
+      # bind on every host interface (this is docker's default, stated explicitly)
+      - "0.0.0.0:8000:8000"
+    volumes:
+      # ws-scrcpy runtime config (android tracker, http port)
+      - ./config.yaml:/app/config.yaml:ro
+      # keep the adb keypair so devices stay authorized across restarts
+      - adb-keys:/root/.android
+      # USB-attached devices. Harmless if you only use wireless adb.
+      - /dev/bus/usb:/dev/bus/usb
+    device_cgroup_rules:
+      # allow character devices in the USB major range (189 = usb devices)
+      - "c 189:* rmw"
+    networks:
+      # own bridge, plus the pangolin network so newt can reach us at ws-scrcpy:8000
+      - default
+      - pangolin
+
+volumes:
+  adb-keys:
+
+networks:
+  pangolin:
+    external: true

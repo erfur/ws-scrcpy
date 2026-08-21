@@ -4,6 +4,7 @@ import { BaseDeviceDescriptor } from '../../types/BaseDeviceDescriptor';
 import { DeviceTrackerEvent } from '../../types/DeviceTrackerEvent';
 import { DeviceTrackerEventList } from '../../types/DeviceTrackerEventList';
 import { html } from '../ui/HtmlTag';
+import { AppShell } from '../ui/AppShell';
 import { ParamsDeviceTracker } from '../../types/ParamsDeviceTracker';
 import { HostItem } from '../../types/Configuration';
 import { Tool } from './Tool';
@@ -63,13 +64,24 @@ export abstract class BaseDeviceTracker<DD extends BaseDeviceDescriptor, TE exte
             port = location.port;
             pathname = location.pathname;
         }
-        const hash = `#!${new URLSearchParams(q).toString()}`;
+        const query = new URLSearchParams(q);
+        const hash = `#!${query.toString()}`;
         const a = document.createElement('a');
         a.setAttribute('href', `${protocol}//${hostname}:${port}${pathname}${hash}`);
         a.setAttribute('rel', 'noopener noreferrer');
         a.setAttribute('target', '_blank');
         a.classList.add(`link-${q.action}`);
         a.innerText = text;
+        a.onclick = (event: MouseEvent): void => {
+            // plain left click opens the tool inside the app shell;
+            // modified clicks keep the default behavior (new browser tab)
+            if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) {
+                return;
+            }
+            if (AppShell.route(query)) {
+                event.preventDefault();
+            }
+        };
         return a;
     }
 
@@ -202,7 +214,8 @@ export abstract class BaseDeviceTracker<DD extends BaseDeviceDescriptor, TE exte
             devices = document.createElement('div');
             devices.id = id;
             devices.className = 'table-wrapper';
-            document.body.appendChild(devices);
+            const holder = AppShell.getDeviceListHolder();
+            (holder || document.body).appendChild(devices);
         }
         return devices;
     }

@@ -1,0 +1,7 @@
+# ws-scrcpy runtime configuration. Spec: src/types/Configuration.d.ts
+runGoogTracker: true
+runApplTracker: false
+
+server:
+  - secure: false
+    port: 8000

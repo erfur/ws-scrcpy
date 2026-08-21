@@ -360,6 +360,23 @@ export class AdbUtils {
         };
     }
 
+    /**
+     * Runs `pm install <flags> <remotePath>` on the device and returns the combined output.
+     * Arguments are passed as an array so adbkit shell-quotes each of them.
+     */
+    public static async installPackage(serial: string, remotePath: string, flags: string[]): Promise<string> {
+        const client = AdbExtended.createClient();
+        const stream = await client.shell(serial, ['pm', 'install', ...flags, remotePath]);
+        const buffer = await AdbExtended.util.readAll(stream);
+        return buffer.toString();
+    }
+
+    public static async removeFile(serial: string, remotePath: string): Promise<void> {
+        const client = AdbExtended.createClient();
+        const stream = await client.shell(serial, ['rm', '-f', remotePath]);
+        await AdbExtended.util.readAll(stream);
+    }
+
     public static async getDeviceName(serial: string): Promise<string> {
         const client = AdbExtended.createClient();
         const props = await client.getProperties(serial);

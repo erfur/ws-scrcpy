@@ -103,6 +103,11 @@ Control your device from `adb shell` in your browser.
 * Upload files by drag & drop
 * Download files
 
+#### APK install
+* Install APKs by drag & drop or via a file picker
+* Choose `pm install` flags (reinstall, test packages, downgrade, grant permissions)
+* Shows upload progress and the installer output; uploaded files are removed after install
+
 ### iOS
 
 ***Experimental Feature***: *is not built by default*
@@ -199,6 +204,7 @@ You can customize project before build by overriding the
 * `INCLUDE_DEV_TOOLS` - [dev tools](#debug-webpageswebview) for web pages and
 web views on android devices
 * `INCLUDE_FILE_LISTING` - minimalistic [file management](#file-listing)
+* `INCLUDE_APK_INSTALL` - [APK installer](#apk-install)
 * `USE_BROADWAY` - include [Broadway Player](#broadway-player)
 * `USE_H264_CONVERTER` - include [Mse Player](#mse-player)
 * `USE_TINY_H264` - include [TinyH264 Player](#tinyh264-player)

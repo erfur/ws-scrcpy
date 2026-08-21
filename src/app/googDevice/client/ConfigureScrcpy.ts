@@ -3,6 +3,8 @@ import GoogDeviceDescriptor from '../../../types/GoogDeviceDescriptor';
 import { DisplayCombinedInfo } from '../../client/StreamReceiver';
 import VideoSettings from '../../VideoSettings';
 import { StreamClientScrcpy } from './StreamClientScrcpy';
+import { AppShell } from '../../ui/AppShell';
+import { ACTION } from '../../../common/Action';
 import Size from '../../Size';
 import Util from '../../Util';
 import { DisplayInfo } from '../../DisplayInfo';
@@ -636,7 +638,16 @@ export class ConfigureScrcpy extends BaseClient<ParamsStreamScrcpy, ConfigureScr
             udid: this.udid,
             fitToScreen,
         };
-        StreamClientScrcpy.start(params, this.streamReceiver, player, fitToScreen, videoSettings);
+        const tab = AppShell.openTab({
+            id: `${ACTION.STREAM_SCRCPY}:${this.udid}`,
+            title: `Stream ${this.deviceName || this.udid}`,
+            className: 'stream',
+            replace: true,
+        });
+        const client = StreamClientScrcpy.start(params, this.streamReceiver, player, fitToScreen, videoSettings);
+        tab.setOnClose(() => {
+            client.stop();
+        });
         this.streamReceiver.triggerInitialInfoEvents();
     };
 }

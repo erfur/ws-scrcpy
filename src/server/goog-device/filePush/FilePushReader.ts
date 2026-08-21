@@ -18,8 +18,21 @@ export class FilePushReader {
     private static fileId = 1;
     private static maxId = 4294967295; // 2^32 - 1
 
-    public static handle(serial: string, channel: WebSocket): FilePushReader {
-        return new FilePushReader(serial, channel);
+    /**
+     * @param allowedDir when set, only pushes whose destination is directly inside this
+     *                   directory are accepted (used by the APK installer)
+     */
+    public static handle(serial: string, channel: WebSocket, allowedDir?: string): FilePushReader {
+        return new FilePushReader(serial, channel, allowedDir);
+    }
+
+    public static isInsideDir(filePath: string, dir: string): boolean {
+        const prefix = dir.endsWith('/') ? dir : `${dir}/`;
+        if (!filePath.startsWith(prefix)) {
+            return false;
+        }
+        const rest = filePath.substring(prefix.length);
+        return rest.length > 0 && !rest.includes('/') && rest !== '.' && rest !== '..';
     }
 
     public static getNextId(): number {
@@ -47,7 +60,11 @@ export class FilePushReader {
     private createStreamPromiseMap: Map<number, Promise<void>> = new Map();
     private disposed = false;
 
-    constructor(private readonly serial: string, private readonly channel: WebSocket) {
+    constructor(
+        private readonly serial: string,
+        private readonly channel: WebSocket,
+        private readonly allowedDir?: string,
+    ) {
         channel.addEventListener('message', this.onMessage);
         channel.addEventListener('close', this.onClose);
     }
@@ -99,6 +116,13 @@ export class FilePushReader {
                 const { fileName, fileSize } = command;
                 if (!fileName) {
                     this.closeWithError(FilePushResponseStatus.ERROR_INVALID_NAME);
+                    return;
+                }
+                if (this.allowedDir && !FilePushReader.isInsideDir(fileName, this.allowedDir)) {
+                    this.closeWithError(
+                        FilePushResponseStatus.ERROR_INVALID_NAME,
+                        `Destination must be inside "${this.allowedDir}"`,
+                    );
                     return;
                 }
                 if (!fileSize) {
